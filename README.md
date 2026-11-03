@@ -1,5 +1,7 @@
 # Billhead
 
+https://invoice.tompkinssoftwaresystems.com
+
 Invoices from your phone. A company profile set up once, then a simple or an advanced invoice made either by answering questions one at a time or by typing straight onto the invoice. Projects keep several invoices together (invoice 2 of 3, billed to date, remaining). The PDF is drawn on the phone and locked against editing. Nothing leaves the device: no account, no server.
 
 Built by Tompkins Software Systems. A billhead is what printers called a business's invoice form a century ago: the name at the top, the bill below.
@@ -43,7 +45,7 @@ Any static server from the repo root, for example `python3 -m http.server 8000`,
 
 ## Deploying
 
-Pushing to `main` runs the tests, assembles `site/`, stamps the service worker and deploys to GitHub Pages, live at https://tompkins52.github.io/Invoice/ (the path is case-sensitive: the repo is named `Invoice`). For a custom domain (for example `invoice.tompkinssoftwaresystems.com`): add a CNAME record at Cloudflare pointing to `tompkins52.github.io` (DNS only), then enter the domain in the repo's Pages settings and turn on Enforce HTTPS. Deploys from Actions need no `CNAME` file.
+Pushing to `main` runs the tests, assembles `site/`, stamps the service worker and deploys to GitHub Pages, live at https://invoice.tompkinssoftwaresystems.com. The custom domain is a Cloudflare CNAME `invoice` pointing to `tompkins52.github.io` (DNS only, gray cloud), entered in the repo's Pages settings with Enforce HTTPS on. Deploys from Actions need no `CNAME` file. The old address, https://tompkins52.github.io/Invoice/, forwards there. Saved data does not move between addresses (each is its own origin), so use a backup file to carry it across.
 
 ## Before charging for downloads
 
