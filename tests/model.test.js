@@ -19,11 +19,30 @@ t("a simple invoice totals its lines and taxes them all", () => {
   assert.strictEqual(x.due, 28.05);
 });
 
-t("a simple invoice ignores advanced amounts even if they are set", () => {
+t("a simple invoice takes a discount and a deposit but not freight or retainage", () => {
   const inv = M.blankInvoice(co, "simple");
   inv.lines = [{ d: "A", q: 1, r: 100 }];
   inv.disc = 10; inv.freight = 5; inv.deposit = 20; inv.retain = 10; inv.tax = "";
-  assert.strictEqual(M.totals(inv).due, 100);
+  assert.strictEqual(M.totals(inv).total, 90);
+  assert.strictEqual(M.totals(inv).due, 70);
+});
+
+t("downloads unlock in order: testing, first invoice, year pass, pack credit, then pay", () => {
+  const state = M.blankState(); const a = M.blankInvoice(co, "simple"), b = M.blankInvoice(co, "advanced"); state.invoices = [a, b];
+  const saved = M.PRICING.mode;
+  assert.strictEqual(M.unlockHow(state, a), "free");
+  M.PRICING.mode = "paid";
+  assert.strictEqual(M.unlockHow(state, a), "first");
+  a.unlock = { how: "first" };
+  assert.strictEqual(M.unlockHow(state, a), "unlocked");
+  assert.strictEqual(M.unlockHow(state, b), "pay");
+  state.credits.advanced = 1;
+  assert.strictEqual(M.unlockHow(state, b), "credit");
+  state.pass.until = M.addDays(M.today(), 10);
+  assert.strictEqual(M.unlockHow(state, b), "pass");
+  state.pass.until = M.addDays(M.today(), -1); state.credits.advanced = 0;
+  assert.strictEqual(M.unlockHow(state, b), "pay");
+  M.PRICING.mode = saved;
 });
 
 t("an advanced invoice applies discount, taxable lines, freight, retainage and deposit", () => {
@@ -93,8 +112,8 @@ t("a simple invoice on a progress project tracks without printing progress", () 
 t("advanced parts are detected", () => {
   const inv = M.blankInvoice(M.blankCompany(), "advanced");
   assert.deepStrictEqual(M.advancedUsed(inv), []);
-  inv.po = "PO 9"; inv.freight = 5; inv.sig.on = true;
-  assert.deepStrictEqual(M.advancedUsed(inv), ["po", "freight", "sig"]);
+  inv.po = "PO 9"; inv.freight = 5; inv.sig.on = true; inv.disc = 5; inv.deposit = 5;
+  assert.deepStrictEqual(M.advancedUsed(inv), ["po", "freight", "sig"], "discount and deposit are simple-tier parts");
   assert.strictEqual(M.price(inv), M.PRICING.advanced);
 });
 

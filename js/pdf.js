@@ -138,13 +138,13 @@
       pageBreak(150);
       var totW = 228, tx = W - m - totW, ty = y;
       var rows = [["Subtotal", money(t.sub)]];
-      if (adv && t.disc) rows.push(["Discount" + (inv.discPct ? " (" + M.num(inv.disc) + "%)" : ""), "-" + money(t.disc)]);
-      if (M.num(inv.tax)) { if (adv && (t.disc || mixedTax || t.taxBase !== t.sub)) rows.push(["Taxable subtotal", money(t.taxBase)]); rows.push([(inv.taxLabel || "Sales tax") + " " + M.num(inv.tax) + "%", money(t.tax)]); }
+      if (t.disc) rows.push(["Discount" + (inv.discPct ? " (" + M.num(inv.disc) + "%)" : ""), "-" + money(t.disc)]);
+      if (M.num(inv.tax)) { if (t.disc || mixedTax || t.taxBase !== t.sub) rows.push(["Taxable subtotal", money(t.taxBase)]); rows.push([(inv.taxLabel || "Sales tax") + " " + M.num(inv.tax) + "%", money(t.tax)]); }
       if (adv && t.freight) rows.push(["Freight", money(t.freight)]);
       var showTotalRow = rows.length > 1 || t.retainAmt || t.deposit || t.paid;
       if (showTotalRow) rows.push(["Total", money(t.total), "total"]);
       if (adv && t.retainAmt) rows.push(["Less retainage (" + t.retainPct + "%)", "-" + money(t.retainAmt)]);
-      if (adv && t.deposit) rows.push(["Deposit received", "-" + money(t.deposit)]);
+      if (t.deposit) rows.push(["Deposit received", "-" + money(t.deposit)]);
       if (t.paid) rows.push(["Payments received", "-" + money(t.paid)]);
       rows.forEach(function (r) {
         if (r[2] === "total") { doc.setDrawColor.apply(doc, [201, 207, 216]); doc.setLineWidth(0.6); doc.line(tx, ty + 2, W - m, ty + 2); ty += 6; font("bold", 9.5, ink); }

@@ -10,7 +10,13 @@
 
   /* Pricing. mode "free" means every download is unlocked (testing). mode "paid" routes a download
      through the checkout (not wired yet: needs a Stripe account and a small worker, see README). */
-  M.PRICING = { mode: "free", simple: 0.99, advanced: 1.99, currency: "USD" };
+  M.PRICING = {
+    mode: "free", currency: "USD",
+    simple: 0.99, advanced: 1.99,
+    firstFree: true,
+    packs: [{ tier: "simple", count: 10, price: 7.99 }, { tier: "advanced", count: 10, price: 14.99 }, { tier: "advanced", count: 50, price: 49 }],
+    pass: { price: 99, days: 365 }
+  };
 
   M.TERMS = ["Due on receipt", "Net 7", "Net 10", "Net 15", "Net 30", "Net 45", "Net 60", "Net 90"];
   M.CURRENCIES = {
@@ -23,8 +29,8 @@
      adding one to a simple invoice moves it to advanced (the app asks first). */
   M.ADVANCED = {
     attn: "Attention line", po: "Purchase order number", ref: "Reference or quote number", ship: "Ship to or job site",
-    period: "Service period", units: "Units on line items", linetax: "Tax per line", disc: "Discount", freight: "Freight or shipping",
-    deposit: "Deposit or payments applied", late: "Late fee or early-pay terms", retain: "Retainage", prog: "Progress billing on a project",
+    period: "Service period", units: "Units on line items", linetax: "Tax per line", freight: "Freight or shipping",
+    late: "Late fee or early-pay terms", retain: "Retainage", prog: "Progress billing on a project",
     sig: "Signature", accept: "Customer acceptance line", taxid: "Tax ID on the invoice", vat: "VAT, GST or registration number",
     currency: "A currency other than US dollars", fine: "Terms and conditions text"
   };
@@ -88,15 +94,14 @@
     var adv = inv.tier === "advanced", sub = 0, taxable = 0;
     (inv.lines || []).forEach(function (l) { var a = M.lineAmount(l); sub += a; if (adv ? l.t !== false : true) taxable += a; });
     sub = M.round2(sub);
-    var disc = 0;
-    if (adv) disc = inv.discPct ? M.round2(sub * M.num(inv.disc) / 100) : M.num(inv.disc);
+    var disc = inv.discPct ? M.round2(sub * M.num(inv.disc) / 100) : M.num(inv.disc);
     disc = Math.min(sub, Math.max(0, M.round2(disc)));
     var taxBase = sub ? Math.max(0, M.round2(taxable - disc * (taxable / sub))) : 0;
     var tax = M.round2(taxBase * M.num(inv.tax) / 100);
     var freight = adv ? M.num(inv.freight) : 0;
     var total = M.round2(sub - disc + tax + freight);
     var retainPct = adv ? Math.max(0, Math.min(100, M.num(inv.retain))) : 0, retainAmt = M.round2(total * retainPct / 100);
-    var deposit = adv ? M.num(inv.deposit) : 0;
+    var deposit = M.num(inv.deposit);
     var paid = M.round2((inv.payments || []).reduce(function (s, p) { return s + M.num(p.amount); }, 0));
     var due = M.round2(total - retainAmt - deposit - paid);
     return { sub: sub, disc: disc, taxBase: taxBase, tax: tax, freight: freight, total: total, retainPct: retainPct, retainAmt: retainAmt, deposit: deposit, paid: paid, due: due, owed: M.round2(total - retainAmt - deposit) };
@@ -112,9 +117,7 @@
     if (inv.from || inv.to) u.push("period");
     if ((inv.lines || []).some(function (l) { return l.u; })) u.push("units");
     if ((inv.lines || []).some(function (l) { return l.t === false; })) u.push("linetax");
-    if (has(inv.disc)) u.push("disc");
     if (has(inv.freight)) u.push("freight");
-    if (has(inv.deposit)) u.push("deposit");
     if (inv.pay && inv.pay.late) u.push("late");
     if (has(inv.retain)) u.push("retain");
     if (inv.prog && inv.prog.on) u.push("prog");
@@ -203,7 +206,16 @@
 
   /* ---------- Storage (one JSON document in localStorage; a backup file is the same document) ---------- */
   M.KEY = "billhead.v1";
-  M.blankState = function () { return { v: M.DATA_VERSION, company: null, clients: [], projects: [], invoices: [], settings: { look: "auto", sounds: false, onboarded: false }, savedAt: "" }; };
+  M.blankState = function () { return { v: M.DATA_VERSION, company: null, clients: [], projects: [], invoices: [], credits: { simple: 0, advanced: 0 }, pass: { until: "" }, settings: { look: "auto", sounds: false, onboarded: false }, savedAt: "" }; };
+  /* How a download gets unlocked, in order: already unlocked, testing, the first invoice, a year pass, a pack credit, or pay. */
+  M.unlockHow = function (state, inv, todayIso) {
+    if (inv.unlock) return "unlocked";
+    if (M.PRICING.mode === "free") return "free";
+    if (M.PRICING.firstFree && !(state.invoices || []).some(function (i) { return i.unlock && i.id !== inv.id; })) return "first";
+    if (state.pass && state.pass.until && state.pass.until >= (todayIso || M.today())) return "pass";
+    if (state.credits && M.num(state.credits[inv.tier]) > 0) return "credit";
+    return "pay";
+  };
   M.normalize = function (data) {
     var s = M.merge(M.blankState(), data || {});
     if (s.company) s.company = M.merge(M.blankCompany(), s.company);
