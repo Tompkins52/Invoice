@@ -255,6 +255,18 @@ with sync_playwright() as pw:
     check(page.locator('.list .item').count() >= 3, 'a reload keeps the invoices')
     shot(page, '11-home')
 
+    # ---------- Nothing on a phone is wider than the phone ----------
+    for route in ['#/', '#/invoices/all', '#/projects']:
+        page.goto(BASE + route, wait_until='networkidle')
+        page.wait_for_timeout(200)
+        sw = page.evaluate('document.documentElement.scrollWidth')
+        check(sw <= 390, 'no sideways scrolling on a phone at %s (page is %d px wide)' % (route, sw))
+    page.goto(BASE + '#/projects', wait_until='networkidle')
+    page.click('a.item')
+    page.wait_for_selector('.stats')
+    sw = page.evaluate('document.documentElement.scrollWidth')
+    check(sw <= 390, 'no sideways scrolling on a project page (page is %d px wide)' % sw)
+
     # ---------- Desktop layout ----------
     dctx = browser.new_context(viewport={'width': 1280, 'height': 900}, storage_state=ctx.storage_state())
     dpage = dctx.new_page()

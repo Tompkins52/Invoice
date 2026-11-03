@@ -66,7 +66,8 @@ input, select, textarea { font: inherit; color: inherit; }
 .tabs a .dot { position: absolute; top: 8px; right: calc(50% - 18px); width: 8px; height: 8px; border-radius: 50%; background: var(--red); }
 
 /* ---------- Layout ---------- */
-.view { max-width: 720px; margin: 0 auto; padding: 1rem 1rem 2rem; animation: rise 0.32s var(--ease); }
+.view { max-width: 720px; margin: 0 auto; padding: 1rem 1rem 2rem; animation: rise 0.32s var(--ease); min-width: 0; }
+.view > *, .stack > * { min-width: 0; }
 .view.wide { max-width: 980px; }
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes pop { 0% { transform: scale(0.96); opacity: 0; } 100% { transform: none; opacity: 1; } }
@@ -117,7 +118,7 @@ input, select, textarea { font: inherit; color: inherit; }
 .inline-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
 .money-in { position: relative; }
 .money-in::before { content: attr(data-sym); position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--muted); font-family: var(--mono); pointer-events: none; }
-.money-in input { padding-left: 1.7rem; }
+.money-in input, .field .money-in input[type="text"] { padding-left: 1.7rem; }
 .switch { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 48px; padding: 0.5rem 0; cursor: pointer; }
 .switch .sw { position: relative; width: 46px; height: 28px; border-radius: 14px; background: var(--line-2); flex: none; transition: background 0.2s; }
 .switch .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); transition: transform 0.22s var(--ease); }
@@ -145,6 +146,7 @@ input, select, textarea { font: inherit; color: inherit; }
 .list { display: grid; gap: 0.5rem; }
 .item { display: grid; grid-template-columns: 1fr auto; gap: 0.2rem 0.8rem; align-items: center; width: 100%; text-align: left; font: inherit; padding: 0.8rem 0.9rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); text-decoration: none; color: inherit; cursor: pointer; transition: transform 0.15s var(--ease), box-shadow 0.15s; animation: rise 0.3s var(--ease) both; }
 .item:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
+.item > div { min-width: 0; }
 .item .t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .item .s { font-size: 0.84rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .item .amt { font-family: var(--mono); font-weight: 600; text-align: right; font-size: 1.02rem; }
@@ -156,9 +158,11 @@ input, select, textarea { font: inherit; color: inherit; }
 .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin: 0.5rem 0 0.6rem; }
 
 /* Stats */
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
-.stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 0.7rem 0.8rem; }
-.stat .v { font-family: var(--mono); font-weight: 600; font-size: 1.15rem; letter-spacing: -0.01em; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; }
+.stat { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 0.7rem 0.8rem; }
+.stat .v { font-family: var(--mono); font-weight: 600; font-size: clamp(0.88rem, 3.5vw, 1.15rem); letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 420px) { .stat .l { font-size: 0.64rem; letter-spacing: 0.02em; } }
+@media (max-width: 380px) { .stats { gap: 0.4rem; } .stat { padding: 0.6rem 0.55rem; } }
 .stat .l { font-size: 0.74rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .stat.red .v { color: var(--red); }
 .stat.green .v { color: var(--green); }
