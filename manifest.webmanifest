@@ -1,0 +1,21 @@
+{
+  "name": "Billhead",
+  "short_name": "Billhead",
+  "description": "Invoices from your phone. A company profile, simple or advanced invoices, projects billed more than once, locked PDFs. Nothing leaves the phone.",
+  "start_url": "./?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F3F5F8",
+  "theme_color": "#1C3F7A",
+  "lang": "en-US",
+  "categories": ["business", "finance", "productivity"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "New simple invoice", "short_name": "Simple", "url": "./?go=new-simple" },
+    { "name": "New advanced invoice", "short_name": "Advanced", "url": "./?go=new-advanced" }
+  ]
+}

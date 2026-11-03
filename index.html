@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en" data-look="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="build" content="dev">
+<title>Billhead</title>
+<meta name="description" content="Invoices from your phone. A company profile, a simple or an advanced invoice, projects billed more than once, and a locked PDF. Nothing leaves the phone.">
+<meta name="theme-color" content="#1C3F7A" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E1319" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Billhead">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preload" href="fonts/plex-sans-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/plex-sans-600.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/plex-mono-500.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="hdr" id="hdr"></header>
+<main id="main"></main>
+<nav class="tabs" id="tabs" aria-label="Sections"></nav>
+<div id="layer"></div>
+<script src="js/model.js"></script>
+<script src="vendor/signature_pad.umd.min.js"></script>
+<script src="js/pdf.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,272 @@
+"""Walks the app the way a person would, in headless Chromium, and checks the PDF it makes.
+Run from the repo root: python3 tests/ui_check.py [--shots]
+
+Covers: the company profile, a simple invoice through Ask me, the same invoice on the page, an advanced
+invoice on a progress project (two invoices, the second shows what the first billed), a signature, a
+payment, and the PDF: encrypted, print and copy allowed, editing not, with the right text on it."""
+import functools
+import http.server
+import io
+import os
+import socketserver
+import sys
+import threading
+import time
+
+from playwright.sync_api import sync_playwright
+from pypdf import PdfReader
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+SHOTS = '--shots' in sys.argv
+SHOT_DIR = os.path.join(ROOT, 'tests', 'shots')
+fails = []
+
+
+def check(ok, what):
+    print(('ok    ' if ok else 'FAIL  ') + what)
+    if not ok:
+        fails.append(what)
+
+
+class Quiet(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+
+socketserver.TCPServer.allow_reuse_address = True
+srv = socketserver.TCPServer(('127.0.0.1', 0), functools.partial(Quiet, directory=ROOT))
+BASE = 'http://127.0.0.1:%d/' % srv.server_address[1]
+threading.Thread(target=srv.serve_forever, daemon=True).start()
+
+
+def shot(page, name):
+    if SHOTS:
+        os.makedirs(SHOT_DIR, exist_ok=True)
+        page.screenshot(path=os.path.join(SHOT_DIR, name + '.png'), full_page=True)
+
+
+def fill(page, selector, value):
+    page.fill(selector, value)
+
+
+def read_pdf(download):
+    data = io.BytesIO(download.path() and open(download.path(), 'rb').read())
+    r = PdfReader(data)
+    return r
+
+
+with sync_playwright() as pw:
+    browser = pw.chromium.launch()
+    ctx = browser.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, accept_downloads=True)
+    page = ctx.new_page()
+    errors = []
+    page.on('pageerror', lambda e: errors.append(str(e)))
+    page.goto(BASE, wait_until='networkidle')
+
+    # ---------- Company profile ----------
+    check(page.url.endswith('#/welcome'), 'a new device opens on the company profile')
+    fill(page, '[data-k="name"]', 'Hart Electric LLC')
+    fill(page, '[data-k="addr"]', '300 Main St, Suite 2\nPrairie City, IL 60000')
+    fill(page, '[data-k="phone"]', '(555) 010-0142')
+    fill(page, '[data-k="email"]', 'office@hartelectric.example')
+    fill(page, '[data-k="taxRate"]', '7.25')
+    fill(page, '[data-k="payInstr"]', 'Mail checks to the address above, or ask for our ACH letter.')
+    fill(page, '[data-k="payLink"]', 'https://pay.example/hart')
+    page.set_input_files('[data-logo]', os.path.join(ROOT, 'tests', 'fixtures', 'logo.png'))
+    page.wait_for_selector('[data-logo-clear]')
+    shot(page, '01-welcome')
+    page.click('[data-company-save]')
+    page.wait_for_selector('[data-new="simple"]')
+    check(page.url.endswith('#/'), 'saving the profile lands on Home')
+    shot(page, '02-home-empty')
+
+    # ---------- Simple invoice through Ask me ----------
+    page.click('[data-new="simple"]')
+    page.wait_for_selector('[data-tool="ask"]')
+    page.click('[data-tool="ask"]')
+    page.wait_for_selector('[data-step="customer"]')
+    fill(page, '[data-k="cust.name"]', 'Lakeside Dental')
+    fill(page, '[data-k="cust.addr"]', '42 Lakeview Dr\nPrairie City, IL 60000')
+    fill(page, '[data-k="cust.email"]', 'ap@lakesidedental.example')
+    shot(page, '03-ask-customer')
+    page.click('[data-next]')
+    page.wait_for_selector('[data-step="project"]')
+    page.click('[data-next]')  # no project
+    page.wait_for_selector('[data-step="work"]')
+    page.fill('[data-line="0"] [data-l="d"]', 'Service call, replace failed GFCI outlets (3)')
+    page.fill('[data-line="0"] [data-l="r"]', '285')
+    page.click('[data-addline]')
+    page.fill('[data-line="1"] [data-l="d"]', 'GFCI outlets')
+    page.fill('[data-line="1"] [data-l="q"]', '3')
+    page.fill('[data-line="1"] [data-l="r"]', '24.50')
+    page.dispatch_event('[data-line="1"] [data-l="r"]', 'change')
+    check('$73.50' in page.inner_text('[data-line="1"]'), 'a line amount follows the quantity and rate')
+    shot(page, '04-ask-lines')
+    page.click('[data-next]')
+    page.wait_for_selector('[data-step="tax"]')
+    check(page.input_value('[data-k="tax"]') == '7.25', 'the tax step is prefilled from the profile')
+    page.click('[data-next]')
+    page.wait_for_selector('[data-step="dates"]')
+    page.click('[data-terms="Net 15"]')
+    page.wait_for_timeout(100)
+    due = page.input_value('[data-k="due"]')
+    date = page.input_value('[data-k="date"]')
+    check(due > date, 'picking Net 15 sets a due date after the invoice date')
+    page.click('[data-next]')
+    page.wait_for_selector('[data-step="pay"]')
+    check('ACH letter' in page.input_value('[data-k="pay.instr"]'), 'payment instructions come from the profile')
+    page.click('[data-next]')
+    page.wait_for_selector('[data-inv]')
+    check('#/edit/' in page.url, 'the last question lands on the invoice itself')
+    shot(page, '05-editor-simple')
+    txt = page.inner_text('[data-inv]')
+    check('Lakeside Dental' in txt and 'GFCI' in txt, 'the invoice shows what was typed')
+    check('$358.50' in txt, 'the subtotal is right (285 + 3 x 24.50)')
+    check('$384.49' in txt, 'tax at 7.25 percent is added to the total')
+    check(page.locator('[data-inv] .add.adv').count() > 0, 'advanced parts show as Advanced links on a simple invoice')
+
+    # ---------- Edit it on the page ----------
+    page.click('[data-inv] [data-f="lines.1.q"]')
+    page.keyboard.press('Control+A')
+    page.keyboard.type('4')
+    page.dispatch_event('[data-inv] [data-f="lines.1.q"]', 'input')
+    page.wait_for_timeout(100)
+    check('$383.00' in page.inner_text('[data-inv] [data-sub]'), 'typing on the page updates the totals')
+    page.click('[data-inv] [data-show="notes"]')
+    page.wait_for_selector('[data-inv] [data-f="pay.notes"]')
+    page.locator('[data-inv] [data-f="pay.notes"]').fill('Thank you for the work.')
+    page.dispatch_event('[data-inv] [data-f="pay.notes"]', 'input')
+
+    # ---------- Download the PDF ----------
+    with page.expect_download() as dl:
+        page.click('[data-pdf]')
+    download = dl.value
+    check(download.suggested_filename.startswith('invoice-inv-1001'), 'the PDF is named after the invoice number (%s)' % download.suggested_filename)
+    r = PdfReader(download.path())
+    check(r.is_encrypted, 'the PDF is encrypted')
+    check(r.decrypt('') == 1, 'it opens with no password')
+    perms = r.user_access_permissions
+    check(bool(perms & 4) and bool(perms & 16) and not (perms & 8) and not (perms & 32), 'permissions: print and copy yes, modify and annotate no (%s)' % int(perms))
+    text = r.pages[0].extract_text()
+    check('Hart Electric LLC' in text and 'Lakeside Dental' in text, 'the PDF carries both parties')
+    check('INV-1001' in text and 'GFCI' in text, 'the PDF carries the number and the lines')
+    check('$383.00' in text and 'Balance due' in text, 'the PDF carries the totals')
+    check('Pay online' in text, 'the payment link prints')
+    check('Invoice ID' in text, 'the fingerprint prints in the footer')
+    check(len(r.pages[0].images) >= 1, 'the logo is in the PDF')
+    page.wait_for_timeout(300)
+    page.click('[data-go^="#/inv/"]')
+    page.wait_for_selector('[data-payment]')
+    check('sent' in page.inner_text('.pill').lower(), 'downloading marks the invoice sent')
+    shot(page, '06-invoice-detail')
+
+    # ---------- Record a payment ----------
+    page.click('[data-payment]')
+    page.wait_for_selector('[data-ok]')
+    page.click('[data-ok]')
+    page.wait_for_selector('.stamp.paid')
+    check(page.locator('.pill.paid').count() > 0, 'a full payment marks it paid and stamps the preview')
+    shot(page, '07-invoice-paid')
+
+    # ---------- Advanced invoice on a progress project, on the page ----------
+    page.goto(BASE + '#/new/advanced', wait_until='networkidle')
+    page.click('[data-tool="edit"]')
+    page.wait_for_selector('[data-inv]')
+    check(page.locator('[data-inv] .add.adv').count() == 0, 'an advanced invoice has no Advanced-only tags')
+    page.click('[data-project]')
+    page.wait_for_selector('[data-newproj]')
+    page.fill('[data-newproj] [data-k="name"]', 'Second-floor exam rooms')
+    page.click('[data-newproj] [data-kind="progress"]')
+    page.fill('[data-newproj] [data-k="contract"]', '9600')
+    page.fill('[data-newproj] [data-k="planned"]', '3')
+    page.fill('[data-newproj] [data-k="po"]', 'PO 4471')
+    page.fill('[data-newproj] [data-k="retain"]', '10')
+    page.click('[data-inv] [data-f="cust.name"]') if False else None
+    page.click('[data-create]')
+    page.wait_for_selector('[data-inv] .inv-prog')
+    txt = page.inner_text('[data-inv]')
+    check('1 of 3' in txt and '$9,600.00' in txt, 'the first invoice on the project is 1 of 3 against the contract')
+    page.locator('[data-inv] [data-f="cust.name"]').fill('Lakeside Dental')
+    page.dispatch_event('[data-inv] [data-f="cust.name"]', 'input')
+    page.locator('[data-inv] [data-f="lines.0.d"]').fill('Mobilization and demolition')
+    page.dispatch_event('[data-inv] [data-f="lines.0.d"]', 'input')
+    page.locator('[data-inv] [data-f="lines.0.r"]').fill('3200')
+    page.dispatch_event('[data-inv] [data-f="lines.0.r"]', 'input')
+    page.click('[data-inv] [data-tax="0"]')  # labor, not taxed
+    page.wait_for_timeout(100)
+    txt = page.inner_text('[data-inv]')
+    check('-$320.00' in txt, 'retainage of 10 percent comes off the balance')
+    check('$2,880.00' in txt, 'the balance due is the total less retainage')
+    # signature
+    page.click('[data-inv] [data-show="sig"]')
+    page.wait_for_selector('.sig-wrap canvas')
+    box = page.locator('.sig-wrap canvas').bounding_box()
+    page.mouse.move(box['x'] + 30, box['y'] + 100)
+    page.mouse.down()
+    for i in range(1, 30):
+        page.mouse.move(box['x'] + 30 + i * 8, box['y'] + 100 + (30 if i % 2 else -30))
+    page.mouse.up()
+    page.fill('.sheet [data-k="name"]', 'Dana Hart')
+    page.fill('.sheet [data-k="title"]', 'Owner')
+    page.click('[data-use]')
+    page.wait_for_selector('[data-inv] .sig-img')
+    check('Dana Hart, Owner' in page.inner_text('[data-inv]'), 'the signature prints with the name and title')
+    shot(page, '08-editor-advanced')
+    with page.expect_download() as dl:
+        page.click('[data-pdf]')
+    r = PdfReader(dl.value.path())
+    r.decrypt('')
+    text = r.pages[0].extract_text()
+    check('PROGRESS ON PO 4471' in text and '1 of 3' in text, 'the PDF carries the progress block')
+    check('retainage' in text.lower() and '$2,880.00' in text, 'the PDF carries retainage and the balance')
+    check('Dana Hart, Owner' in text and 'Signed electronically' in text, 'the PDF carries the signature line')
+    check(len(r.pages[0].images) >= 2, 'the logo and the signature are both in the PDF')
+
+    # second invoice on the same project
+    page.goto(BASE + '#/projects', wait_until='networkidle')
+    page.click('a.item')
+    page.wait_for_selector('a[href^="#/new//"]')
+    check('$3,200.00' in page.inner_text('.view'), 'the project page shows what was billed')
+    page.click('a[href^="#/new//"]')
+    page.wait_for_selector('[data-tier="advanced"]')
+    page.click('[data-tier="advanced"]')
+    page.click('[data-tool="edit"]')
+    page.wait_for_selector('[data-inv] .inv-prog')
+    txt = page.inner_text('[data-inv]')
+    check('2 of 3' in txt and '$3,200.00' in txt, 'the second invoice is 2 of 3 and shows the first as previously billed')
+    check('Lakeside Dental' in txt, 'the customer carries over from the project')
+    shot(page, '09-second-progress-invoice')
+
+    # ---------- Lists and backup ----------
+    page.goto(BASE + '#/invoices', wait_until='networkidle')
+    check(page.locator('.list .item').count() == 3, 'the invoices list shows all three')
+    page.goto(BASE + '#/more', wait_until='networkidle')
+    with page.expect_download() as dl:
+        page.click('[data-backup]')
+    check(dl.value.suggested_filename.startswith('billhead-backup-'), 'a backup file downloads')
+    shot(page, '10-more')
+
+    # ---------- Reload keeps everything ----------
+    page.goto(BASE, wait_until='networkidle')
+    check('Hart Electric' in page.inner_text('#hdr'), 'a reload keeps the company')
+    check(page.locator('.list .item').count() >= 3, 'a reload keeps the invoices')
+    shot(page, '11-home')
+
+    # ---------- Desktop layout ----------
+    dctx = browser.new_context(viewport={'width': 1280, 'height': 900}, storage_state=ctx.storage_state())
+    dpage = dctx.new_page()
+    dpage.on('pageerror', lambda e: errors.append(str(e)))
+    dpage.goto(BASE, wait_until='networkidle')
+    check(dpage.locator('.tabs .rail-brand').is_visible(), 'the tab bar is a left rail on a wide screen')
+    shot(dpage, '12-desktop-home')
+    dpage.goto(BASE + '#/invoices', wait_until='networkidle')
+    dpage.click('a.item')
+    dpage.wait_for_selector('[data-inv]')
+    shot(dpage, '13-desktop-invoice')
+
+    check(not errors, 'no page errors' + ('' if not errors else ': ' + '; '.join(errors[:3])))
+    browser.close()
+
+print()
+print('%d checks, %d failed' % (len(fails) + 0 if False else 0, len(fails)) if False else ('ALL PASSED' if not fails else '%d FAILED:\n  ' % len(fails) + '\n  '.join(fails)))
+sys.exit(1 if fails else 0)
