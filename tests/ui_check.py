@@ -267,6 +267,30 @@ with sync_playwright() as pw:
     dpage.wait_for_selector('[data-inv]')
     shot(dpage, '13-desktop-invoice')
 
+    # ---------- An invoice carried over from TSS Invoice Creator ----------
+    import base64, json as _json
+    old = {"biz": {"name": "Prairie Plumbing", "addr": "12 Elm St\nPrairie City, IL", "phone": "(555) 010-0199", "email": "office@prairieplumbing.example", "web": "", "taxid": "", "accent": "#12352b", "logo": ""},
+           "num": "INV-2207", "date": "2026-11-01", "terms": "Net 15", "due": "2026-11-16", "po": "PO 88", "ref": "", "cust": {"name": "Elm Street Cafe", "attn": "", "addr": "40 Elm St", "email": ""},
+           "ship": "", "desc": "", "from": "", "to": "", "lines": [{"d": "Water heater, 50 gal", "q": 1, "r": 1325, "t": True}, {"d": "Labor", "q": 4, "r": 110, "t": False}],
+           "disc": "", "tax": 7.25, "freight": "", "paid": "", "prog": {"on": False, "contract": "", "n": 1, "m": 3, "prev": ""}, "pay": {"to": "Prairie Plumbing", "late": "", "instr": "Checks to the address above.", "notes": ""}}
+    code = base64.urlsafe_b64encode(_json.dumps({"v": 1, "src": "tss-invoice-creator", "inv": old}).encode()).decode().rstrip("=")
+    ictx = browser.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=1)
+    ipage = ictx.new_page()
+    ipage.on('pageerror', lambda e: errors.append(str(e)))
+    ipage.goto(BASE + '#import=' + code, wait_until='networkidle')
+    ipage.wait_for_selector('[data-company-save]')
+    check('TSS Invoice Creator' in ipage.inner_text('main') and ipage.input_value('[data-k="name"]') == 'Prairie Plumbing', 'a new device opens the profile filled in from the old tool')
+    check('#import=' not in ipage.url, 'the carried-over invoice is cleared from the address')
+    ipage.click('[data-company-save]')
+    ipage.wait_for_selector('[data-inv]')
+    txt = ipage.inner_text('[data-inv]')
+    check('INV-2207' in txt and 'Elm Street Cafe' in txt and 'PO 88' in txt, 'saving the profile opens the carried-over invoice, number and PO kept')
+    check(ipage.locator('.pill.adv').count() > 0, 'a carried-over invoice with a PO comes over as advanced')
+    ipage.goto(BASE + '#import=' + code, wait_until='networkidle')
+    ipage.wait_for_selector('[data-inv]')
+    check('INV-2208' in ipage.inner_text('[data-inv]'), 'carrying the same invoice over again gives it the next number instead of a duplicate')
+    ictx.close()
+
     check(not errors, 'no page errors' + ('' if not errors else ': ' + '; '.join(errors[:3])))
     browser.close()
 

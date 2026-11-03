@@ -126,7 +126,19 @@
   function emptyState(text, action) { return '<div class="empty">' + I.sheet + "<p>" + text + "</p>" + (action || "") + "</div>"; }
 
   /* ---------- Router ---------- */
+  /* An invoice carried over from TSS Invoice Creator arrives as #import=..., is read here, and leaves the address at once. */
+  function takeImport() {
+    var imp = /^#import=([A-Za-z0-9_-]+)$/.exec(location.hash || "");
+    if (!imp) return false;
+    var oldInv = M.decodeImport(imp[1]);
+    history.replaceState(null, "", location.pathname + location.search + "#/");
+    if (!oldInv) { toast("That link did not carry an invoice this app can read."); return false; }
+    var got = M.fromCreator(oldInv, S.company);
+    if (S.company) { addImported(got.invoice); return true; }
+    importDraft = got; return false;
+  }
   function route() {
+    if (!ART && takeImport()) return;
     closeSheet(); mainHandlers = {};
     var h = currentHash().replace(/^#\/?/, ""), parts = h.split("/");
     if (!S.company) { if (parts[0] !== "welcome") { if (ART) { memHash = "#/welcome"; return route(); } location.replace("#/welcome"); return; } return viewWelcome(); }
@@ -212,10 +224,25 @@
   }
   function viewWelcome() {
     tabs(null); header(M.NAME);
-    var c = S.company ? M.clone(S.company) : M.blankCompany();
+    var c = S.company ? M.clone(S.company) : (importDraft ? M.clone(importDraft.company) : M.blankCompany());
     $main.innerHTML = '<div class="view"><div class="card navy" style="margin-bottom:1rem"><div class="row" style="gap:0.8rem;align-items:center">' + MARK.replace('class="mark"', 'class="mark" style="width:44px;height:44px;border-radius:10px"') + '<div><h1 style="color:inherit">' + M.NAME + '</h1><div class="muted">' + esc(M.TAGLINE) + '</div></div></div><p style="margin:0.9rem 0 0">Set up your company once. After that, every new invoice starts filled in: your name and logo, your terms, your tax rate, how to pay you. Invoices and projects stay on this phone and go out as locked PDFs.</p></div>' +
+      (importDraft ? '<div class="inv-bar" style="margin-bottom:1rem"><span>Your details came over from <b>TSS Invoice Creator</b>, with invoice <b class="mono">' + esc(importDraft.invoice.num) + "</b>. Check them, add anything missing, and save; the invoice opens next.</span></div>" : "") +
       "<h2 style=\"margin:0 0 0.6rem\">Your company</h2>" + companyForm(c, !S.company) + "</div>";
-    bindCompanyForm($main, c, function (done) { done.createdAt = done.createdAt || M.today(); S.company = done; S.settings.onboarded = true; save(true); go("#/"); toast("Saved. Your first invoice takes about two minutes."); });
+    bindCompanyForm($main, c, function (done) {
+      done.createdAt = done.createdAt || M.today(); S.company = done; S.settings.onboarded = true; save(true);
+      if (importDraft) { var inv = importDraft.invoice; importDraft = null; addImported(inv); return; }
+      go("#/"); toast("Saved. Your first invoice takes about two minutes.");
+    });
+  }
+  /* An invoice carried over from TSS Invoice Creator: kept as a draft, its number kept unless it is taken. */
+  var importDraft = null;
+  function addImported(inv) {
+    var taken = S.invoices.some(function (i) { return i.num === inv.num && i.status !== "void"; });
+    if (taken) { inv.num = (S.company.prefix || "") + S.company.next; S.company.next = (M.num(S.company.next) || 1) + 1; }
+    else { var m = /^(.*?)(\d+)$/.exec(inv.num || ""); if (m && m[1] === (S.company.prefix || "") && Number(m[2]) >= M.num(S.company.next)) S.company.next = Number(m[2]) + 1; }
+    inv.status = "draft"; inv.createdAt = inv.updatedAt = M.today();
+    S.invoices.push(inv); if (inv.cust.name) ensureClient(inv); save(true);
+    go("#/edit/" + inv.id); toast("Brought over from TSS Invoice Creator. Check it, then download it from here.", 4200);
   }
   function viewCompany() {
     tabs("more"); header("Company profile", { back: "#/more" });
@@ -896,9 +923,9 @@
       (iosSafariTab() ? '<div class="card" style="border-color:var(--amber)"><h3>Keep it safe</h3><p class="small" style="margin-top:0.4rem">In Safari, tap Share, then <b>Add to Home Screen</b>. As a home-screen app, Billhead opens full screen and works offline, and Safari stops counting the days toward clearing its stored data (it clears a site\'s data after seven days without a visit). Keep a backup file either way.</p></div>' : "") +
       '<div class="card"><h3>Backup</h3><p class="small muted" style="margin-top:0.4rem">Everything lives on this device only. A backup file holds your company, customers, projects and invoices; keep one somewhere safe, and use it to move to a new phone.</p><div class="row"><button type="button" class="btn" data-backup>Save a backup file</button><label class="btn file-btn">Restore from a backup<input type="file" accept=".json,application/json" data-restore></label>' + (S.invoices.length ? '<button type="button" class="btn" data-csv>Invoices as CSV</button>' : "") + "</div></div>" +
       '<div class="card"><h3>Pricing</h3>' + (M.PRICING.mode === "free" ? '<p class="small" style="margin-top:0.4rem"><b>Free while the app is in testing.</b> The plan once it is not:</p>' : "") + pricingTable() +
-      '<p class="small muted">No subscription, no account, no ads, and we never touch your customer\'s payment. Free invoicing apps earn on that payment instead: 2.9 percent plus 60 cents on a $1,000 invoice is $29.60. Here a $1,000 invoice costs ' + M.priceText(M.PRICING.simple) + ".</p></div>" +
+      '<p class="small muted">No subscription, no account, no ads. Billhead charges for the invoice and never takes a percentage of what your customer pays you: a $1,000 invoice costs ' + M.priceText(M.PRICING.simple) + " to make, and your customer pays you however you like. Apps that are free to send often take 2.9 percent plus 60 cents when the customer pays by card through them, which is $29.60 on $1,000.</p></div>" +
       '<div class="card"><h3>About</h3><p class="small" style="margin-top:0.4rem"><b>' + M.NAME + "</b> by Tompkins Software Systems. A billhead is what printers called a business's invoice form a century ago: the name at the top, the bill below. Nothing you type leaves this device; there is no server and no account. PDFs are drawn on the phone and locked against editing. Build " + esc(build) + '.</p><p class="small muted">Type: IBM Plex (SIL Open Font License). PDF: jsPDF (MIT). Signatures: signature_pad (MIT).</p>' +
-      '<div class="row"><a class="btn small" href="https://' + M.SITE + '/support.html" target="_blank" rel="noopener">Support</a><a class="btn small" href="https://' + M.SITE + '/privacy.html" target="_blank" rel="noopener">Privacy</a>' + (S.invoices.length ? "" : '<button type="button" class="btn small" data-sample>Load a sample company</button>') + '<button type="button" class="btn-text danger" data-forget>Forget everything on this device</button></div></div></div>';
+      '<div class="row"><a class="btn small" href="https://' + M.SITE + '/support.html#billhead" target="_blank" rel="noopener">Support</a><a class="btn small" href="https://' + M.SITE + '/privacy.html#billhead" target="_blank" rel="noopener">Privacy</a>' + (S.invoices.length ? "" : '<button type="button" class="btn small" data-sample>Load a sample company</button>') + '<button type="button" class="btn-text danger" data-forget>Forget everything on this device</button></div></div></div>';
     onMain("click", function (e) {
       var b;
       if ((b = e.target.closest("[data-setlook]"))) { S.settings.look = b.getAttribute("data-setlook"); applyLook(); save(); viewMore(); return; }

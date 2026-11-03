@@ -234,6 +234,49 @@
     try { localStorage.setItem(M.KEY, JSON.stringify(state)); return true; } catch (e) { return false; }
   };
 
+  /* ---------- Coming from TSS Invoice Creator (the company site's old free tool) ---------- */
+  /* Turns one of its saved invoices into a Billhead company profile and invoice. The old tool's
+     default evergreen accent becomes Billhead's navy; a tax rate of zero makes every line taxable,
+     so a plain invoice stays simple. */
+  M.fromCreator = function (old, company) {
+    old = old || {};
+    var b = old.biz || {}, p = old.pay || {}, c = M.blankCompany(), numOrBlank = function (v) { return v === "" || v == null ? "" : M.num(v); };
+    c.name = String(b.name || ""); c.logo = /^data:image\//.test(b.logo || "") ? b.logo : ""; c.addr = String(b.addr || ""); c.phone = String(b.phone || ""); c.email = String(b.email || ""); c.web = String(b.web || ""); c.taxid = String(b.taxid || "");
+    if (/^#[0-9a-f]{6}$/i.test(b.accent || "") && String(b.accent).toLowerCase() !== "#12352b") c.accent = b.accent;
+    c.terms = M.TERMS.indexOf(old.terms) >= 0 ? old.terms : "Net 30"; c.taxRate = numOrBlank(old.tax);
+    c.payTo = p.to || c.name; c.payInstr = p.instr || ""; c.late = p.late || "";
+    var nm = /^(.*?)(\d+)$/.exec(old.num || ""); if (nm) { c.prefix = nm[1]; c.next = Number(nm[2]) + 1; }
+    var inv = M.blankInvoice(company || c, "simple");
+    inv.num = old.num || inv.num; inv.date = /^\d{4}-\d{2}-\d{2}$/.test(old.date || "") ? old.date : inv.date; inv.terms = c.terms;
+    inv.due = /^\d{4}-\d{2}-\d{2}$/.test(old.due || "") ? old.due : M.dueFor(inv.date, inv.terms); inv.dueAuto = inv.due === M.dueFor(inv.date, inv.terms);
+    var cu = old.cust || {};
+    inv.cust = { name: String(cu.name || ""), attn: String(cu.attn || ""), addr: String(cu.addr || ""), email: String(cu.email || ""), phone: "" };
+    inv.po = String(old.po || ""); inv.ref = String(old.ref || ""); inv.ship = String(old.ship || ""); inv.desc = String(old.desc || ""); inv.from = old.from || ""; inv.to = old.to || "";
+    var taxed = M.num(old.tax) > 0;
+    inv.lines = (old.lines || []).map(function (l) { return { d: String(l.d || ""), q: l.q === "" || l.q == null ? 1 : M.num(l.q), u: "", r: numOrBlank(l.r), t: taxed ? l.t !== false : true }; });
+    if (!inv.lines.length) inv.lines = [M.blankLine()];
+    inv.disc = numOrBlank(old.disc); inv.discPct = false; inv.tax = c.taxRate; inv.freight = numOrBlank(old.freight); inv.deposit = numOrBlank(old.paid);
+    var pr = old.prog || {};
+    inv.prog = { on: !!pr.on, contract: numOrBlank(pr.contract), n: M.num(pr.n) || 1, m: M.num(pr.m) || 2, prev: numOrBlank(pr.prev) };
+    inv.pay = { to: String(p.to || ""), instr: String(p.instr || ""), link: "", late: String(p.late || ""), notes: String(p.notes || "") };
+    inv.tier = M.advancedUsed(inv).length ? "advanced" : "simple";
+    return { company: c, invoice: inv };
+  };
+  /* The address the company site sends a saved invoice to: base64url of {v, inv} after #import=. */
+  M.encodeImport = function (inv) {
+    var json = JSON.stringify({ v: 1, src: "tss-invoice-creator", inv: inv });
+    var b64 = typeof btoa === "function" ? btoa(unescape(encodeURIComponent(json))) : Buffer.from(json, "utf8").toString("base64");
+    return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  };
+  M.decodeImport = function (code) {
+    try {
+      var b64 = String(code || "").replace(/-/g, "+").replace(/_/g, "/"); while (b64.length % 4) b64 += "=";
+      var json = typeof atob === "function" ? decodeURIComponent(escape(atob(b64))) : Buffer.from(b64, "base64").toString("utf8");
+      var data = JSON.parse(json);
+      return data && data.inv && Array.isArray(data.inv.lines) ? data.inv : null;
+    } catch (e) { return null; }
+  };
+
   /* ---------- Sample ---------- */
   M.sampleCompany = function () {
     var c = M.blankCompany();

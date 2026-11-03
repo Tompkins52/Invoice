@@ -140,4 +140,22 @@ t("a backup normalizes into a full state", () => {
   assert.strictEqual(s.invoices[0].tier, "simple");
 });
 
+t("an invoice from TSS Invoice Creator comes over with its company, and the tier it needs", () => {
+  const old = { biz: { name: "Hart Electric LLC", addr: "300 Main St", phone: "555", email: "o@h.example", web: "", taxid: "", accent: "#12352b", logo: "" },
+    num: "INV-1043", date: "2026-11-01", terms: "Net 15", due: "2026-11-16", po: "", ref: "", cust: { name: "Lakeside Dental", attn: "", addr: "42 Lakeview Dr", email: "ap@l.example" },
+    ship: "", desc: "Panel work", from: "", to: "", lines: [{ d: "Parts", q: 1, r: 1180, t: true }, { d: "Labor", q: 8, r: 95, t: false }],
+    disc: 50, tax: "", freight: "", paid: 500, prog: { on: false, contract: "", n: 1, m: 3, prev: "" }, pay: { to: "Hart Electric LLC", late: "", instr: "Mail a check", notes: "Thanks" } };
+  const got = M.fromCreator(old, null);
+  assert.strictEqual(got.company.name, "Hart Electric LLC");
+  assert.strictEqual(got.company.accent, "#1C3F7A", "the old default evergreen becomes the navy");
+  assert.strictEqual(got.company.prefix, "INV-"); assert.strictEqual(got.company.next, 1044); assert.strictEqual(got.company.terms, "Net 15");
+  assert.strictEqual(got.invoice.tier, "simple", "no tax, so the untaxed line does not make it advanced");
+  assert.strictEqual(M.totals(got.invoice).due, 1180 + 8 * 95 - 50 - 500);
+  old.po = "PO 4471"; old.tax = 7.25; old.prog = { on: true, contract: 9600, n: 2, m: 3, prev: 3200 };
+  const adv = M.fromCreator(old, null).invoice;
+  assert.strictEqual(adv.tier, "advanced"); assert.strictEqual(adv.prog.prev, 3200); assert.strictEqual(adv.lines[1].t, false);
+  assert.deepStrictEqual(M.decodeImport(M.encodeImport(old)), old, "the address round-trips, accents and all");
+  assert.strictEqual(M.decodeImport("not-base64!"), null);
+});
+
 setTimeout(() => console.log("\n" + n + " checks passed"), 50);
