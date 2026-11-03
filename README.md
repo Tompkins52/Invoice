@@ -43,7 +43,7 @@ Any static server from the repo root, for example `python3 -m http.server 8000`,
 
 ## Deploying
 
-Pushing to `main` runs the tests, assembles `site/`, stamps the service worker and deploys to GitHub Pages. For a custom domain (for example `invoice.tompkinssoftwaresystems.com`): add a CNAME record at Cloudflare pointing to `tompkins52.github.io` (DNS only), set the custom domain in the repo's Pages settings, and add a `CNAME` file to the site step of the workflow.
+Pushing to `main` runs the tests, assembles `site/`, stamps the service worker and deploys to GitHub Pages, live at https://tompkins52.github.io/Invoice/ (the path is case-sensitive: the repo is named `Invoice`). For a custom domain (for example `invoice.tompkinssoftwaresystems.com`): add a CNAME record at Cloudflare pointing to `tompkins52.github.io` (DNS only), then enter the domain in the repo's Pages settings and turn on Enforce HTTPS. Deploys from Actions need no `CNAME` file.
 
 ## Before charging for downloads
 
