@@ -5,6 +5,8 @@
   "use strict";
   var M = window.BH, S = M.load();
   var $main = document.getElementById("main"), $hdr = document.getElementById("hdr"), $tabs = document.getElementById("tabs"), $layer = document.getElementById("layer");
+  /* Inside a claude.ai artifact preview the address bar is not ours, so routes live in memory there. */
+  var ART = !!(window.claude && typeof window.claude.use === "function"), memHash = "#/";
   var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
   var money = function (n, cur) { return M.money(n, cur || (S.company && S.company.currency) || "USD"); };
   var sym = function (cur) { return (M.CURRENCIES[cur || (S.company && S.company.currency) || "USD"] || M.CURRENCIES.USD).symbol; };
@@ -12,7 +14,7 @@
   var mainHandlers = {};
   function onMain(type, fn) { mainHandlers[type] = fn; }
   ["click", "input", "change", "keydown"].forEach(function (type) { $main.addEventListener(type, function (e) { if (mainHandlers[type]) mainHandlers[type](e); }); });
-  var canShareFiles = (function () { try { return !!(navigator.share && navigator.canShare && navigator.canShare({ files: [new File(["x"], "x.pdf", { type: "application/pdf" })] })); } catch (e) { return false; } })();
+  var canShareFiles = (function () { try { return !ART && !!(navigator.share && navigator.canShare && navigator.canShare({ files: [new File(["x"], "x.pdf", { type: "application/pdf" })] })); } catch (e) { return false; } })();
   /* On a phone the share sheet is the way out (Save to Files, Mail, Messages, AirDrop); on a computer, a download. */
   function pdfButtons(primary) {
     if (canShareFiles) return '<button type="button" class="btn ' + (primary || "primary") + '" data-share>' + I.share + ' Share PDF</button><button type="button" class="btn" data-pdf>' + I.down + " Download</button>";
@@ -24,7 +26,8 @@
     var run = function () { if (!M.save(S)) toast("Could not save on this device. Storage may be full or blocked."); };
     if (now) run(); else saveTimer = setTimeout(run, 300);
   }
-  function go(hash) { if (location.hash === hash) route(); else location.hash = hash; }
+  function currentHash() { return ART ? memHash : location.hash; }
+  function go(hash) { if (ART) { memHash = hash; route(); return; } if (location.hash === hash) route(); else location.hash = hash; }
   function invoiceById(id) { return S.invoices.filter(function (i) { return i.id === id; })[0]; }
   function projectById(id) { return S.projects.filter(function (p) { return p.id === id; })[0]; }
   function clientById(id) { return S.clients.filter(function (c) { return c.id === id; })[0]; }
@@ -88,7 +91,8 @@
   }
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeSheet(); });
   document.addEventListener("click", function (e) {
-    var g = e.target.closest("[data-go]"); if (g) { e.preventDefault(); go(g.getAttribute("data-go")); }
+    var g = e.target.closest("[data-go]"); if (g) { e.preventDefault(); go(g.getAttribute("data-go")); return; }
+    if (ART) { var a = e.target.closest('a[href^="#/"]'); if (a) { e.preventDefault(); go(a.getAttribute("href")); } }
   });
 
   /* ---------- Shared pieces ---------- */
@@ -124,8 +128,8 @@
   /* ---------- Router ---------- */
   function route() {
     closeSheet(); mainHandlers = {};
-    var h = location.hash.replace(/^#\/?/, ""), parts = h.split("/");
-    if (!S.company) { if (parts[0] !== "welcome") { location.replace("#/welcome"); return; } return viewWelcome(); }
+    var h = currentHash().replace(/^#\/?/, ""), parts = h.split("/");
+    if (!S.company) { if (parts[0] !== "welcome") { if (ART) { memHash = "#/welcome"; return route(); } location.replace("#/welcome"); return; } return viewWelcome(); }
     switch (parts[0]) {
       case "": case "home": return viewHome();
       case "welcome": return viewWelcome();
@@ -773,6 +777,10 @@
     return Promise.resolve(download(blob, out.name));
   }
   function download(blob, name) {
+    if (ART) {
+      return window.claude.use("downloads").then(function (d) { if (!d) throw new Error("Saving files is not available in this preview."); return d.save({ filename: name, data: blob }); })
+        .then(function () { return "downloaded"; }, function (e) { if (e && e.code === "declined") return "cancelled"; toast("Could not save the file: " + (e && e.message ? e.message : e)); return "cancelled"; });
+    }
     var url = URL.createObjectURL(blob), a = document.createElement("a"); a.href = url; a.download = name; a.rel = "noopener"; document.body.appendChild(a); a.click();
     setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 2000);
     return "downloaded";
@@ -920,9 +928,9 @@
   applyLook();
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () { });
   var goParam = /[?&]go=([a-z-]+)/.exec(location.search);
-  if (goParam && S.company) { history.replaceState(null, "", location.pathname + "#/new/" + goParam[1].replace("new-", "")); }
+  if (goParam && S.company && !ART) { history.replaceState(null, "", location.pathname + "#/new/" + goParam[1].replace("new-", "")); }
   route();
-  if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  if (!ART && "serviceWorker" in navigator && location.protocol !== "file:") {
     navigator.serviceWorker.register("sw.js").then(function (reg) {
       reg.addEventListener("updatefound", function () {
         var w = reg.installing; if (!w) return;
