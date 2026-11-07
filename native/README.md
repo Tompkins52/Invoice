@@ -9,7 +9,9 @@ The Android app is the web app in a Capacitor shell: the same `index.html`, `app
   `data_extraction_rules.xml` back up only that file; the WebView's own storage is rebuilt from it)
 - the share sheet for PDFs (`Share PDF`) and `Save to phone` into `Documents/Billhead/`
 - the back button, the system bars (edge to edge; the web app pads its header and tab bar with the
-  safe-area insets) and the splash screen
+  safe-area insets) and the splash screen, which is plain navy (no icon, `windowSplashScreenAnimatedIcon`
+  is transparent in `res/values/styles.xml`) and stays up until the first screen is drawn; then the app's
+  own launch animation shows the mark (see the main README)
 
 Nothing in the web app changes for the browser: `js/app.js` looks for `window.BHNative` and uses the
 normal download and share paths when it is not there.
@@ -47,10 +49,13 @@ Signing by hand: set `BILLHEAD_KEYSTORE_FILE`, `BILLHEAD_KEYSTORE_PASSWORD`, `BI
 `BILLHEAD_KEY_PASSWORD` in the environment before `gradlew`.
 
 Icons and splash: `python3 tools/make_icons.py android` draws the source images into `native/assets/`,
-then `npx capacitor-assets generate --android --iconBackgroundColor '#1C3F7A' --splashBackgroundColor '#1C3F7A'`
-(the adaptive icon background is a solid color set in `res/values/ic_launcher_background.xml`).
+then `npx capacitor-assets generate --android --iconBackgroundColor '#1C3F7A' --splashBackgroundColor '#1C3F7A'`.
+The adaptive icon background is a solid color set in `res/values/ic_launcher_background.xml`: afterwards put
+back `mipmap-anydpi-v26/ic_launcher.xml` and `ic_launcher_round.xml` (`git checkout` them) and delete the
+`mipmap-*/ic_launcher_background.png` files the tool adds. The splash images are plain navy.
 
 ## Tests
 
 - `python3 tests/native_check.py` (after assembling): the app with the shell stubbed, in Chromium.
-- `native/smoke/smoke.sh app-debug.apk`: on an emulator or a phone with USB debugging.
+- `native/smoke/smoke.sh app-debug.apk`: on an emulator or a phone with USB debugging. It records the first
+  start as `native/smoke/out/launch.mp4` (the splash, then the launch animation), kept with the run's artifacts.

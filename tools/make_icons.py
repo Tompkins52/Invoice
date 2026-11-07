@@ -3,48 +3,61 @@ With "android", writes the source images @capacitor/assets wants into native/ass
 (icon-only, icon-foreground, icon-background at 1024 and the splash at 2732).
 
 The mark is a billhead: a sheet of paper with the company's band across the top and the bill below it,
-on a navy tile. One SVG, rendered with the bundled Chromium (Playwright) at each size."""
+on a navy tile. Billhead is an Upfront for Small Business app, so the band is the family's striped awning,
+swept up to the right the way the family's arrow is. The launch animation in index.html draws the same
+mark part by part (tests/ui_check.py checks the two match). One SVG, drawn on a 1024 grid and rendered
+with the bundled Chromium (Playwright) at each size. The native splash is plain navy: the launch
+animation, not the splash, shows the mark."""
+import math
 import os
 import sys
 
-from playwright.sync_api import sync_playwright
+NAVY, PAPER, RED, FOLD, LINE = '#1C3F7A', '#F3F5F8', '#E4572E', '#D9DFE7', '#C5CDD8'
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 OUT = os.path.join(ROOT, 'icons')
 
 
-def svg(size, pad, rounded):
-    # pad: fraction of the tile kept clear around the sheet (maskable icons need a bigger safe zone).
-    s = size
-    r = s * 0.22 if rounded else 0
-    sheet_w, sheet_h = s * (0.50 - pad), s * (0.64 - pad)
-    x = (s - sheet_w) / 2
-    y = (s - sheet_h) / 2
-    fold = sheet_w * 0.26
-    band_h = sheet_h * 0.17
-    line = lambda i, w: '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="%.1f" fill="#C5CDD8"/>' % (x + sheet_w * 0.16, y + band_h + sheet_h * (0.22 + i * 0.16), sheet_w * w, sheet_h * 0.055, sheet_h * 0.027)
-    return '''<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d">
-<rect width="%d" height="%d" rx="%.1f" fill="#1C3F7A"/>
-<path d="M%.1f %.1f h%.1f l%.1f %.1f v%.1f h-%.1f z" fill="#FFFFFF"/>
-<path d="M%.1f %.1f v%.1f h%.1f z" fill="#D9DFE7"/>
-<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="#1C3F7A"/>
-%s%s%s
-<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="%.1f" fill="#1C3F7A"/>
-</svg>''' % (s, s, s, s, s, s, r,
-             x, y, sheet_w - fold, fold, fold, sheet_h - fold, sheet_w,
-             x + sheet_w - fold, y, fold, fold,
-             x + sheet_w * 0.16, y + sheet_h * 0.30, sheet_w * 0.46, band_h * 0.5,
-             line(0, 0.62), line(1, 0.52), line(2, 0.40),
-             x + sheet_w * 0.16, y + band_h + sheet_h * 0.70, sheet_w * 0.68, sheet_h * 0.07, sheet_h * 0.035)
+def awning(x0, x1, top, bottom, n=4, swept=34):
+    """The family's awning: n stripes, red and navy, each with a scalloped hem. swept lifts the right end."""
+    w = (x1 - x0) / n
+    lift = lambda x: -swept * (x - x0) / (x1 - x0)
+    out = []
+    for i in range(n):
+        a, b = x0 + i * w, x0 + (i + 1) * w
+        ta, tb, ba, bb = top + lift(a), top + lift(b), bottom + lift(a), bottom + lift(b)
+        r = math.hypot(b - a, bb - ba) / 2
+        out.append('<path class="bh-st" style="--i:%d" d="M%.1f,%.1f L%.1f,%.1f L%.1f,%.1f A%.1f,%.1f 0 0 1 %.1f,%.1f Z" fill="%s"/>'
+                   % (i, a, ta, b, tb, b, bb, r, r, a, ba, RED if i % 2 == 0 else NAVY))
+    return ''.join(out)
 
 
-def splash_svg(size):
-    # The mark (sheet only, no tile) in the middle of a navy field; the system splash shows the launcher icon the same way.
-    mark = 0.34
-    inner = svg(int(size * mark), 0.0, False).replace('<rect width="%d" height="%d" rx="0.0" fill="#1C3F7A"/>' % (int(size * mark), int(size * mark)), '')
-    off = size * (1 - mark) / 2
-    return ('<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d"><rect width="%d" height="%d" fill="#1C3F7A"/>'
-            '<g transform="translate(%.1f %.1f)">%s</g></svg>') % (size, size, size, size, size, size, off, off, inner)
+def mark():
+    """The mark on the 1024 grid, no tile. The classes are what the launch animation moves."""
+    x, y, w, h, fold, r = 292, 184, 440, 656, 112, 18
+    sheet = ('<path class="bh-sheet" d="M%d,%d H%d L%d,%d V%d a%d,%d 0 0 1 -%d,%d H%d a%d,%d 0 0 1 -%d,-%d V%d a%d,%d 0 0 1 %d,-%d Z" fill="%s"/>'
+             % (x + r, y, x + w - fold, x + w, y + fold, y + h - r, r, r, r, r, x + r, r, r, r, r, y + r, r, r, r, r, PAPER))
+    corner = ('<path class="bh-fold" d="M%d,%d V%d a%d,%d 0 0 0 %d,%d H%d Z" fill="%s"/>'
+              % (x + w - fold, y, y + fold - r, r, r, r, r, x + w, FOLD))
+    band = awning(x + 40, x + w - 128, y + 56, y + 56 + 78 + 16)
+    lines = ''.join('<rect class="bh-line" style="--i:%d" x="%d" y="%d" width="%d" height="30" rx="15" fill="%s"/>'
+                    % (i, x + 64, y + 330 + i * 62, lw, LINE) for i, lw in enumerate((236, 196, 150)))
+    total = '<rect class="bh-total" x="%d" y="%d" width="%d" height="44" rx="22" fill="%s"/>' % (x + 64, y + h - 132, w - 128, NAVY)
+    return sheet + corner + band + lines + total
+
+
+def svg(size, scale=1.0, tile='square'):
+    """The icon at size px. tile: 'square', 'rounded' or None (transparent). scale shrinks the mark about the
+    middle for icons that are masked (maskable web icon, Android adaptive foreground)."""
+    t = (1 - scale) * 512
+    back = {'square': '<rect width="1024" height="1024" fill="%s"/>' % NAVY,
+            'rounded': '<rect width="1024" height="1024" rx="225" fill="%s"/>' % NAVY, None: ''}[tile]
+    return ('<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 1024 1024">%s'
+            '<g transform="translate(%.1f %.1f) scale(%.3f)">%s</g></svg>') % (size, size, back, t, t, scale, mark())
+
+
+def plain(size):
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d"><rect width="%d" height="%d" fill="%s"/></svg>' % (size, size, size, size, NAVY)
 
 
 def render(b, markup, size, path, transparent):
@@ -56,26 +69,29 @@ def render(b, markup, size, path, transparent):
 
 
 def main():
+    from playwright.sync_api import sync_playwright
     android = len(sys.argv) > 1 and sys.argv[1] == 'android'
     with sync_playwright() as pw:
         b = pw.chromium.launch()
         if android:
             out = os.path.join(ROOT, 'native', 'assets')
             os.makedirs(out, exist_ok=True)
-            render(b, svg(1024, 0.0, False), 1024, os.path.join(out, 'icon-only.png'), False)
-            fg = svg(1024, 0.12, False).replace('<rect width="1024" height="1024" rx="0.0" fill="#1C3F7A"/>', '')
-            render(b, fg, 1024, os.path.join(out, 'icon-foreground.png'), True)
-            render(b, '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024"><rect width="1024" height="1024" fill="#1C3F7A"/></svg>', 1024, os.path.join(out, 'icon-background.png'), False)
-            render(b, splash_svg(2732), 2732, os.path.join(out, 'splash.png'), False)
-            render(b, splash_svg(2732), 2732, os.path.join(out, 'splash-dark.png'), False)
+            render(b, svg(1024), 1024, os.path.join(out, 'icon-only.png'), False)
+            # The asset tool insets the foreground to the adaptive icon's visible 72 dp, which the launcher masks
+            # (a circle on most phones); at 0.92 the sheet sits well inside the 66 dp safe circle.
+            render(b, svg(1024, 0.92, None), 1024, os.path.join(out, 'icon-foreground.png'), True)
+            render(b, plain(1024), 1024, os.path.join(out, 'icon-background.png'), False)
+            render(b, plain(2732), 2732, os.path.join(out, 'splash.png'), False)
+            render(b, plain(2732), 2732, os.path.join(out, 'splash-dark.png'), False)
             b.close()
             return
         os.makedirs(OUT, exist_ok=True)
-        jobs = [('icon-192.png', 192, 0.0, True), ('icon-512.png', 512, 0.0, True), ('apple-touch-icon.png', 180, 0.0, False), ('maskable-512.png', 512, 0.10, False)]
-        for name, size, pad, rounded in jobs:
-            render(b, svg(size, pad, rounded), size, os.path.join(OUT, name), True)
+        jobs = [('icon-192.png', 192, 1.0, 'rounded'), ('icon-512.png', 512, 1.0, 'rounded'),
+                ('apple-touch-icon.png', 180, 1.0, 'square'), ('maskable-512.png', 512, 0.92, 'square')]
+        for name, size, scale, tile in jobs:
+            render(b, svg(size, scale, tile), size, os.path.join(OUT, name), True)
         b.close()
-    open(os.path.join(OUT, 'mark.svg'), 'w').write(svg(64, 0.0, True))
+    open(os.path.join(OUT, 'mark.svg'), 'w').write(svg(64, 1.0, 'rounded'))
 
 
 if __name__ == '__main__':

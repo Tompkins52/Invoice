@@ -53,7 +53,7 @@ TOTAL = 38.5
 
 def page_html():
     imgs = {n: data_url(n) for n in ['00-welcome', '02-ask', '03-edit', '04-project', '05-pdf', '06-kinds', 'pdf-page']}
-    with open(os.path.join(ROOT, 'native', 'assets', 'icon-foreground.png'), 'rb') as f:
+    with open(os.path.join(ROOT, 'native', 'assets', 'icon-only.png'), 'rb') as f:
         mark = 'data:image/png;base64,' + base64.b64encode(f.read()).decode('ascii')
     scenes_js = json.dumps([[s, e, h, sub, [list(x) for x in shots]] for s, e, h, sub, shots in SCENES])
     phones = ''.join('<img class="shot" data-shot="%s" src="%s">' % (n, imgs[n]) for n in ['00-welcome', '02-ask', '03-edit', '04-project', '05-pdf', '06-kinds'])
@@ -64,7 +64,7 @@ body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: l
 .blob { position: absolute; border-radius: 50%; background: rgba(255,255,255,0.06); }
 #title, #end { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .mark { width: 230px; height: 230px; border-radius: 52px; background: #1C3F7A; box-shadow: 0 30px 80px rgba(0,0,0,0.4); overflow: hidden; }
-.mark img { width: 340px; height: 340px; margin: -55px 0 0 -55px; }
+.mark img { width: 230px; height: 230px; display: block; }
 .name { font-size: 150px; font-weight: 700; letter-spacing: -0.025em; line-height: 1; margin-top: 34px; }
 .tag { font-size: 46px; color: rgba(255,255,255,0.84); margin-top: 22px; }
 #text { position: absolute; left: 140px; top: 0; width: 900px; height: 1080px; display: flex; flex-direction: column; justify-content: center; }

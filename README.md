@@ -4,7 +4,7 @@ https://invoice.tompkinssoftwaresystems.com
 
 Invoices from your phone. A company profile set up once, then a simple or an advanced invoice made either by answering questions one at a time or by typing straight onto the invoice. Projects keep several invoices together (invoice 2 of 3, billed to date, remaining). The PDF is drawn on the phone and locked against editing. Nothing leaves the device: no account, no server.
 
-Built by Tompkins Software Systems. A billhead is what printers called a business's invoice form a century ago: the name at the top, the bill below.
+Built by Tompkins Software Systems, one of its Upfront for Small Business apps. A billhead is what printers called a business's invoice form a century ago: the name at the top, the bill below. The mark is one: a sheet whose band across the top is the family's striped awning.
 
 Web app, installable from the browser (Add to Home Screen). App Store and Google Play versions come later.
 
@@ -32,13 +32,15 @@ Web app, installable from the browser (Add to Home Screen). App Store and Google
 | `fonts/` | IBM Plex Sans and IBM Plex Mono (SIL Open Font License): woff2 for the screen, subset TTF for the PDF. |
 | `manifest.webmanifest`, `sw.js`, `icons/` | Home-screen install and offline use. The service worker caches the whole shell under one version and serves every page load from it. |
 | `tools/stamp_sw.py` | Run by the deploy: stops if a cached file is missing, sets the worker's VERSION to a hash of the shell, stamps the build into the page. |
-| `tools/make_icons.py` | Draws the icons (one SVG rendered with Playwright). |
+| `tools/make_icons.py` | Draws the icons: the mark on a 1024 grid, rendered with Playwright at each size (`android` for the shell's source images). The launch animation in `index.html` and the header mark in `js/app.js` are the same drawing; `tests/ui_check.py` checks they match. |
 | `tests/model.test.js` | Math and records. `node tests/model.test.js` |
-| `tests/ui_check.py` | Walks the app in headless Chromium: profile, a simple invoice by questions and on the page, an advanced invoice on a progress project with a signature and retainage, a payment, the second invoice on the project, a backup, a reload, the desktop layout; and opens each PDF with pypdf to confirm encryption, permissions, text, logo and signature. `python3 tests/ui_check.py --shots` keeps screenshots in `tests/shots/`. |
+| `tests/ui_check.py` | Walks the app in headless Chromium: profile, a simple invoice by questions and on the page, an advanced invoice on a progress project with a signature and retainage, a payment, the second invoice on the project, a backup, a reload, the desktop layout, the launch animation; and opens each PDF with pypdf to confirm encryption, permissions, text, logo and signature. `python3 tests/ui_check.py --shots` keeps screenshots in `tests/shots/`. |
 
 ## Look
 
 Business: navy ink on cool paper, a ledger rule across the top of cards, tabular numbers in IBM Plex Mono for amounts and invoice numbers, IBM Plex Sans for everything else. Status colors: green paid, amber partly paid, red overdue. Light and dark, following the phone unless set under More. Motion is restrained: screens rise in, list rows stagger, sheets slide up, and a PAID stamp slams onto the invoice when it is paid in full. The invoice itself uses the company's own accent color.
+
+Opening: like every Upfront for Small Business app, Billhead opens with the family's launch, once a session. On navy, the mark builds (the sheet rises, the awning drops, the lines and the total draw in) and the name comes up, then "by Upfront for Small Business" with the family mark. 3 seconds, and a tap skips it. The markup is at the top of `index.html` so it is there from the first paint; the script in its head turns it on (`html.uf-on`; not under test automation unless the address has `?intro=1`), `intro()` in `js/app.js` starts it once the first screen is drawn (in the Android app, as the plain navy splash lifts) and removes it at the end, and `app.css` has the motion. With reduced motion it is the finished picture for about a second. The next app in the family copies this with its own mark and name.
 
 ## Running it
 

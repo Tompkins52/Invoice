@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs the debug build on an Android emulator and checks that it starts, shows the app, restores its state file,
-# and survives an Auto Backup round trip (backup, wipe, restore). Used by .github/workflows/android.yml.
+# and survives an Auto Backup round trip (backup, wipe, restore). Records the first start as launch.mp4.
+# Used by .github/workflows/android.yml.
 # Usage: smoke.sh path/to/app-debug.apk
 set -euo pipefail
 APK="$1"
@@ -42,9 +43,16 @@ adb shell settings put global transition_animation_scale 0 || true
 adb shell settings put global animator_duration_scale 0 || true
 adb logcat -c || true
 
-# 1. Fresh install: the app starts on the company profile.
+# 1. Fresh install: the app starts on the company profile. The first start is recorded (launch.mp4), with
+#    animations on for it: the plain navy splash, then the launch animation, then the app.
 adb install -r "$APK"
+adb shell settings put global animator_duration_scale 1 || true
+timeout 30 adb shell screenrecord --time-limit 10 /sdcard/launch.mp4 > /dev/null 2>&1 &
+REC=$!
 launch 12
+wait "$REC" || true
+adb pull /sdcard/launch.mp4 "$OUT/launch.mp4" > /dev/null 2>&1 || echo "      (no launch recording on this emulator)"
+adb shell settings put global animator_duration_scale 0 || true
 screen 01-fresh
 crashed && fail "the app crashed on a fresh start"
 ok "fresh start, no crash"

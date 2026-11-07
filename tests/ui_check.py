@@ -3,7 +3,8 @@ Run from the repo root: python3 tests/ui_check.py [--shots]
 
 Covers: the company profile, a simple invoice through Ask me, the same invoice on the page, an advanced
 invoice on a progress project (two invoices, the second shows what the first billed), a signature, a
-payment, and the PDF: encrypted, print and copy allowed, editing not, with the right text on it."""
+payment, and the PDF: encrypted, print and copy allowed, editing not, with the right text on it. Also the
+launch animation: the same mark as the icons, about 3 seconds, a tap skips it, once a session."""
 import functools
 import http.server
 import io
@@ -315,6 +316,53 @@ with sync_playwright() as pw:
     ipage.wait_for_selector('[data-inv]')
     check('INV-2208' in ipage.inner_text('[data-inv]'), 'carrying the same invoice over again gives it the next number instead of a duplicate')
     ictx.close()
+
+    # ---------- The launch animation (the Upfront for Small Business family's) ----------
+    sys.path.insert(0, os.path.join(ROOT, 'tools'))
+    import re as _re
+    import make_icons
+    html = open(os.path.join(ROOT, 'index.html'), encoding='utf-8').read()
+    appjs = open(os.path.join(ROOT, 'js', 'app.js'), encoding='utf-8').read()
+    check(make_icons.mark() in html, 'the launch animation draws the same mark as the icons')
+    check(_re.sub(r' class="[^"]*"| style="--i:\d"', '', make_icons.mark()) in appjs, 'the mark in the header is the same drawing as the icons')
+    lctx = browser.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=1)
+    lpage = lctx.new_page()
+    lpage.on('pageerror', lambda e: errors.append(str(e)))
+    lpage.goto(BASE, wait_until='networkidle')
+    check(lpage.locator('#uf-intro').count() == 0, 'under test automation the app opens without it')
+    lpage.goto(BASE + '?intro=1')
+    lpage.wait_for_selector('#uf-intro.uf-go', state='attached', timeout=5000)
+    t0 = time.time()
+    check(lpage.evaluate('!!document.elementFromPoint(195, 422).closest("#uf-intro")'), 'it covers the app while it plays')
+    words = lpage.inner_text('#uf-intro')
+    check('Billhead' in words and 'Upfront for Small Business' in words, 'it shows Billhead, then by Upfront for Small Business')
+    lpage.wait_for_selector('#uf-intro', state='detached', timeout=6000)
+    took = time.time() - t0
+    check(2.4 < took < 4.2, 'it ends by itself in about 3 seconds (%.1f s)' % took)
+    check(not lpage.evaluate('document.documentElement.classList.contains("uf-on")'), 'nothing of it is left on the page')
+    lpage.goto(BASE + '?intro=1')
+    lpage.wait_for_selector('#uf-intro.uf-go', state='attached', timeout=5000)
+    lpage.wait_for_timeout(500)
+    t0 = time.time()
+    lpage.mouse.click(195, 422)
+    lpage.wait_for_selector('#uf-intro', state='detached', timeout=3000)
+    check(time.time() - t0 < 1.0, 'a tap skips it')
+    lctx.close()
+    # Once a session: a person (no automation) sees it when the app opens, not again on a reload.
+    sctx = browser.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=1)
+    sctx.add_init_script('Object.defineProperty(navigator, "webdriver", { get: function () { return false; } });')
+    spage = sctx.new_page()
+    spage.on('pageerror', lambda e: errors.append(str(e)))
+    spage.goto(BASE)
+    try:
+        spage.wait_for_selector('#uf-intro.uf-go', state='attached', timeout=5000)
+        played = True
+    except Exception:
+        played = False
+    check(played, 'it plays when the app opens')
+    spage.reload(wait_until='networkidle')
+    check(spage.locator('#uf-intro').count() == 0, 'it does not play again in the same session')
+    sctx.close()
 
     check(not errors, 'no page errors' + ('' if not errors else ': ' + '; '.join(errors[:3])))
     browser.close()

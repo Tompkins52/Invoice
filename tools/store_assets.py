@@ -94,14 +94,15 @@ def raw_screens(pw, base):
     b.close()
 
 
-FONT_CSS = """
-@font-face { font-family: 'Plex Sans'; src: url('%(b)sfonts/plex-sans-400.woff2') format('woff2'); font-weight: 400; }
-@font-face { font-family: 'Plex Sans'; src: url('%(b)sfonts/plex-sans-500.woff2') format('woff2'); font-weight: 500; }
-@font-face { font-family: 'Plex Sans'; src: url('%(b)sfonts/plex-sans-600.woff2') format('woff2'); font-weight: 600; }
-@font-face { font-family: 'Plex Sans'; src: url('%(b)sfonts/plex-sans-700.woff2') format('woff2'); font-weight: 700; }
-@font-face { font-family: 'Plex Mono'; src: url('%(b)sfonts/plex-mono-500.woff2') format('woff2'); font-weight: 500; }
-* { box-sizing: border-box; } body { margin: 0; font-family: 'Plex Sans', sans-serif; -webkit-font-smoothing: antialiased; }
-"""
+def font_css():
+    # The fonts go in as data URLs: the graphics are set_content pages (about:blank), and the local server
+    # sends no CORS header, so fonts fetched from it would fall back to a system face.
+    css = ''
+    for fam, name, weight in [('Plex Sans', 'plex-sans-400', 400), ('Plex Sans', 'plex-sans-500', 500), ('Plex Sans', 'plex-sans-600', 600),
+                              ('Plex Sans', 'plex-sans-700', 700), ('Plex Mono', 'plex-mono-500', 500)]:
+        with open(os.path.join(ROOT, 'fonts', name + '.woff2'), 'rb') as f:
+            css += "@font-face { font-family: '%s'; src: url('data:font/woff2;base64,%s') format('woff2'); font-weight: %d; }\n" % (fam, base64.b64encode(f.read()).decode('ascii'), weight)
+    return css + "* { box-sizing: border-box; } body { margin: 0; font-family: 'Plex Sans', sans-serif; -webkit-font-smoothing: antialiased; }\n"
 
 
 def data_url(path):
@@ -127,7 +128,7 @@ def captioned(b, base):
         if not head:
             continue
         img = data_url(os.path.join(RAW, name + '.png'))
-        html = '<html><head><style>' + FONT_CSS % {'b': base} + """
+        html = '<html><head><style>' + font_css() + """
           body { width: 1080px; height: 1920px; background: linear-gradient(160deg, #1C3F7A 0%, #122A52 100%); position: relative; overflow: hidden; color: #fff; }
           .blob { position: absolute; border-radius: 50%; background: rgba(255,255,255,0.06); }
           .cap { position: absolute; left: 80px; right: 80px; top: 96px; }
@@ -149,13 +150,13 @@ def icon_and_feature(b, base):
     src = os.path.join(ROOT, 'native', 'assets', 'icon-only.png')
     Image.open(src).resize((512, 512), Image.LANCZOS).save(os.path.join(OUT, 'icon-512.png'))
     print('store/icon-512.png')
-    mark = data_url(os.path.join(ROOT, 'native', 'assets', 'icon-foreground.png'))
+    mark = data_url(os.path.join(ROOT, 'native', 'assets', 'icon-only.png'))
     home = data_url(os.path.join(RAW, '01-home.png'))
-    html = '<html><head><style>' + FONT_CSS % {'b': base} + """
+    html = '<html><head><style>' + font_css() + """
       body { width: 1024px; height: 500px; background: linear-gradient(135deg, #1C3F7A 0%, #122A52 100%); position: relative; overflow: hidden; color: #fff; }
       .blob { position: absolute; border-radius: 50%; background: rgba(255,255,255,0.06); }
       .mark { position: absolute; left: 56px; top: 118px; width: 150px; height: 150px; background: #1C3F7A; border-radius: 34px; box-shadow: 0 16px 40px rgba(0,0,0,0.35); overflow: hidden; }
-      .mark img { width: 220px; height: 220px; margin: -35px 0 0 -35px; }
+      .mark img { width: 150px; height: 150px; display: block; }
       .name { position: absolute; left: 236px; top: 128px; font-size: 92px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
       .tag { position: absolute; left: 240px; top: 240px; font-size: 32px; color: rgba(255,255,255,0.84); line-height: 1.3; }
       .phone { position: absolute; right: 48px; top: 70px; width: 300px; height: 600px; border-radius: 34px; background: #0E1319; padding: 10px; box-shadow: 0 30px 80px rgba(0,0,0,0.45); transform: rotate(-6deg); }

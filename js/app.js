@@ -59,7 +59,8 @@
     pen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10-10-4-4L4 16z"/><path d="M12 8l4 4"/></svg>',
     sheet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5 3h14v18H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>'
   };
-  var MARK = '<svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1C3F7A"/><path d="M19 14h21l7 7v29H19z" fill="#fff"/><path d="M40 14v7h7" fill="#D9DFE7"/><rect x="19" y="14" width="21" height="9" fill="#1C3F7A" opacity="0.001"/><rect x="24" y="27" width="16" height="3.5" rx="1.5" fill="#1C3F7A"/><rect x="24" y="34" width="14" height="2.4" rx="1.2" fill="#C5CDD8"/><rect x="24" y="39" width="12" height="2.4" rx="1.2" fill="#C5CDD8"/><rect x="24" y="44" width="16" height="2.4" rx="1.2" fill="#C5CDD8"/></svg>';
+  /* The app's mark, the same drawing as the icons (tools/make_icons.py; tests/ui_check.py checks they match). */
+  var MARK = '<svg class="mark" viewBox="0 0 1024 1024" aria-hidden="true"><rect width="1024" height="1024" rx="224" fill="#1C3F7A"/><path d="M310,184 H620 L732,296 V822 a18,18 0 0 1 -18,18 H310 a18,18 0 0 1 -18,-18 V202 a18,18 0 0 1 18,-18 Z" fill="#F3F5F8"/><path d="M620,184 V278 a18,18 0 0 0 18,18 H732 Z" fill="#D9DFE7"/><path d="M332.0,240.0 L400.0,231.5 L400.0,325.5 A34.3,34.3 0 0 1 332.0,334.0 Z" fill="#E4572E"/><path d="M400.0,231.5 L468.0,223.0 L468.0,317.0 A34.3,34.3 0 0 1 400.0,325.5 Z" fill="#1C3F7A"/><path d="M468.0,223.0 L536.0,214.5 L536.0,308.5 A34.3,34.3 0 0 1 468.0,317.0 Z" fill="#E4572E"/><path d="M536.0,214.5 L604.0,206.0 L604.0,300.0 A34.3,34.3 0 0 1 536.0,308.5 Z" fill="#1C3F7A"/><rect x="356" y="514" width="236" height="30" rx="15" fill="#C5CDD8"/><rect x="356" y="576" width="196" height="30" rx="15" fill="#C5CDD8"/><rect x="356" y="638" width="150" height="30" rx="15" fill="#C5CDD8"/><rect x="356" y="708" width="312" height="44" rx="22" fill="#1C3F7A"/></svg>';
 
   /* ---------- Frame: header, tabs, toasts, sheets ---------- */
   function header(title, opts) {
@@ -1072,12 +1073,39 @@
     download(new Blob([csv], { type: "text/csv" }), "billhead-invoices-" + M.today() + ".csv"); toast("CSV saved.");
   }
 
+  /* ---------- Launch animation ----------
+     Billhead's mark and name, then "by Upfront for Small Business" (index.html has the markup, app.css the motion).
+     It runs when the head script turned it on (html.uf-on, once a session) and starts once the first screen is
+     drawn; in the Android app that is when the splash lifts. The status bar icons go light over the navy meanwhile.
+     A tap skips it; when it ends the markup is removed. */
+  var introStarted = false;
+  function intro() {
+    var el = document.getElementById("uf-intro");
+    if (introStarted || !el) return;
+    introStarted = true;
+    if (!document.documentElement.classList.contains("uf-on")) { el.parentNode.removeChild(el); return; }
+    var over = false;
+    function end() {
+      if (over) return;
+      over = true;
+      if (el.parentNode) el.parentNode.removeChild(el);
+      document.documentElement.classList.remove("uf-on");
+      if (NATIVE) NATIVE.setDark(isDark()).catch(function () { });
+    }
+    if (NATIVE) NATIVE.setDark(true).catch(function () { });
+    el.addEventListener("animationend", function (e) { if (e.target === el && /^uf(Out|Skip|Gone)$/.test(e.animationName)) end(); });
+    el.addEventListener("click", function () { el.classList.add("uf-skip"); setTimeout(end, 400); });
+    setTimeout(end, 3600);
+    el.classList.add("uf-go");
+  }
+
   /* ---------- Start ---------- */
   applyLook();
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () { });
   var goParam = /[?&]go=([a-z-]+)/.exec(location.search);
   if (goParam && S.company && !ART) { history.replaceState(null, "", location.pathname + "#/new/" + goParam[1].replace("new-", "")); }
   route();
+  if (!NATIVE) intro();
   if (NATIVE) {
     /* A fresh install restored from a phone backup has the file but not the browser storage: take the file. Otherwise the newer of the two wins. */
     NATIVE.loadState().then(function (text) {
@@ -1086,7 +1114,9 @@
       if (!data || !data.company) return;
       var mine = S.savedAt || "", theirs = data.savedAt || "";
       if (!S.company || theirs > mine) { S = M.normalize(data); M.save(S); applyLook(); if (/welcome/.test(currentHash())) go("#/"); else route(); }
-    }).catch(function () { }).then(function () { NATIVE.ready(); });
+    }).catch(function () { }).then(function () { NATIVE.ready(); intro(); });
+    /* The shell lifts the splash by itself after 4 seconds if the state file never answers; start the animation then too. */
+    setTimeout(intro, 4000);
     NATIVE.onBack(function () {
       if ($layer.querySelector(".sheet-wrap")) { closeSheet(); return; }
       var h = currentHash().replace(/^#\/?/, "");

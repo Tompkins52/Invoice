@@ -3,7 +3,8 @@ Run from the repo root after tools/assemble_native.py: python3 tests/native_chec
 
 The shell is stubbed here (no emulator): the stub records every call. Covers the splash and status bar
 calls, the state file written on every save, a fresh install restored from that file alone (the way a new
-phone gets the data back), Share PDF and Save to phone going through the shell, and the back button."""
+phone gets the data back), Share PDF and Save to phone going through the shell, the back button, and the
+launch animation starting only as the splash lifts."""
 import functools
 import http.server
 import json
@@ -162,6 +163,23 @@ with sync_playwright() as pw:
     check('Prairie Dental' in body or 'INV-' in body or '1,200' in body, 'the invoice came back from the state file')
     check(page2.evaluate('localStorage.getItem("billhead.v1") !== null'), 'the restored state is written back to browser storage')
     ctx2.close()
+
+    # ---------- The launch animation waits for the splash ----------
+    ctx4 = browser.new_context(viewport={'width': 390, 'height': 844}, color_scheme='light')
+    ctx4.add_init_script(STUB % 'null')
+    ctx4.add_init_script('window.BHNative.loadState = function () { __native.calls.push("loadState"); return new Promise(function (r) { setTimeout(function () { r(__native.state); }, 900); }); };')
+    page4 = ctx4.new_page()
+    page4.on('pageerror', lambda e: errors.append(str(e)))
+    page4.goto(BASE + '?intro=1')
+    page4.wait_for_timeout(400)
+    check(page4.evaluate('!!document.querySelector("#uf-intro") && !document.querySelector("#uf-intro.uf-go")'), 'the launch animation waits while the splash is up')
+    page4.wait_for_function('window.__native.calls.indexOf("ready") >= 0')
+    page4.wait_for_selector('#uf-intro.uf-go', state='attached', timeout=2000)
+    c = calls(page4)
+    check('setDark:true' in c and c.index('setDark:true') > c.index('ready'), 'it starts as the splash lifts, with light status bar icons over the navy')
+    page4.wait_for_selector('#uf-intro', state='detached', timeout=6000)
+    check([x for x in calls(page4) if x.startswith('setDark:')][-1] == 'setDark:false', 'when it ends the status bar icons match the look again')
+    ctx4.close()
 
     # ---------- The web build is untouched: no shell, the normal download path ----------
     ctx3 = browser.new_context(viewport={'width': 390, 'height': 844}, accept_downloads=True)
