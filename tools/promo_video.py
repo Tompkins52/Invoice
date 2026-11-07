@@ -7,6 +7,7 @@ one HTML page with a render(t) function, stepped at 30 frames a second, then sti
     python3 tools/promo_video.py 12.5       # one frame at 12.5 s, to store/promo-frame.png
 """
 import base64
+import json
 import os
 import shutil
 import subprocess
@@ -40,20 +41,21 @@ def font_css():
 SCENES = [
     (4.0, 9.5, 'Set up your company once.', 'Your logo, your terms, your tax rate, how to pay you. After that every invoice starts filled in.', [('00-welcome', 4.0, 9.5)]),
     (9.5, 16.0, 'Make an invoice two ways.', 'Answer a few questions, or type straight onto the page. It adds up as you go.', [('02-ask', 9.5, 12.8), ('03-edit', 12.8, 16.0)]),
-    (16.0, 21.0, 'Bill a project in stages.', 'Invoice 2 of 3, billed to date, retainage held: progress billing without a spreadsheet.', [('04-project', 16.0, 21.0)]),
-    (21.0, 26.0, 'Locked PDFs, signed in the app.', 'Your customer can print it and pay it, not change it. Share it from your phone.', [('05-pdf', 21.0, 26.0)]),
-    (26.0, 31.0, 'Any invoice under $100 is free.', 'Otherwise 99 cents for a simple invoice, $1.99 for an advanced one. No subscription, no account, no ads.', [('06-kinds', 26.0, 31.0)]),
+    (16.0, 20.5, 'Bill a project in stages.', 'Invoice 2 of 3, billed to date, retainage held: progress billing without a spreadsheet.', [('04-project', 16.0, 20.5)]),
+    (20.5, 25.5, 'Send it from your phone.', 'One tap opens your email app with the PDF attached and the customer already filled in.', [('05-pdf', 20.5, 25.5)]),
+    (25.5, 30.0, 'Locked PDFs, signed in the app.', 'Your customer can print it and pay it, not change it.', [('03-edit', 25.5, 30.0)]),
+    (30.0, 35.0, 'Any invoice under $100 is free.', 'Otherwise 99 cents for a simple invoice, $1.99 for an advanced one. No subscription, no account, no ads.', [('06-kinds', 30.0, 35.0)]),
 ]
 TITLE_END = 4.0
-END_START = 31.0
-TOTAL = 34.5
+END_START = 35.0
+TOTAL = 38.5
 
 
 def page_html():
     imgs = {n: data_url(n) for n in ['00-welcome', '02-ask', '03-edit', '04-project', '05-pdf', '06-kinds', 'pdf-page']}
     with open(os.path.join(ROOT, 'native', 'assets', 'icon-foreground.png'), 'rb') as f:
         mark = 'data:image/png;base64,' + base64.b64encode(f.read()).decode('ascii')
-    scenes_js = repr([[s, e, h, sub, shots] for s, e, h, sub, shots in SCENES]).replace("'", '"')
+    scenes_js = json.dumps([[s, e, h, sub, [list(x) for x in shots]] for s, e, h, sub, shots in SCENES])
     phones = ''.join('<img class="shot" data-shot="%s" src="%s">' % (n, imgs[n]) for n in ['00-welcome', '02-ask', '03-edit', '04-project', '05-pdf', '06-kinds'])
     return """<!DOCTYPE html><html><head><meta charset="utf-8"><style>
 """ + font_css() + """
@@ -71,8 +73,8 @@ body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: l
 #phone { position: absolute; left: 1220px; top: 60px; width: 560px; height: 960px; border-radius: 56px; background: #0E1319; padding: 14px; box-shadow: 0 40px 120px rgba(0,0,0,0.5); }
 #phone .screen { position: relative; width: 532px; height: 932px; border-radius: 44px; overflow: hidden; background: #F3F5F8; }
 #phone .shot { position: absolute; left: 0; top: 0; width: 532px; height: 946px; object-fit: cover; object-position: top; opacity: 0; }
-#paper { position: absolute; left: 1060px; top: 150px; width: 420px; height: 544px; box-shadow: 0 30px 80px rgba(0,0,0,0.5); border-radius: 8px; overflow: hidden; background: #fff; transform-origin: bottom left; }
-#paper img { width: 420px; display: block; }
+#paper { position: absolute; left: 980px; top: 170px; width: 400px; height: 518px; box-shadow: 0 30px 80px rgba(0,0,0,0.5); border-radius: 8px; overflow: hidden; background: #fff; transform-origin: bottom left; }
+#paper img { width: 400px; display: block; }
 #end .small { font-size: 40px; color: rgba(255,255,255,0.84); margin-top: 26px; }
 #end .pill { margin-top: 40px; font-size: 34px; font-weight: 600; padding: 18px 40px; border-radius: 999px; background: rgba(255,255,255,0.14); }
 </style></head><body>
@@ -127,6 +129,7 @@ function render(t) {
       img.style.opacity = op;
     });
     var isPdf = scene[2].indexOf('PDF') >= 0;
+    text.style.width = isPdf ? '760px' : '900px';
     var pin = isPdf ? fadeIn(t, s0 + 0.8, 0.8) : 0;
     paper.style.opacity = isPdf ? Math.min(pin, hout) : 0;
     paper.style.transform = 'rotate(' + (-8 + 4 * pin) + 'deg) translateY(' + (60 * (1 - pin)) + 'px)';

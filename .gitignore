@@ -14,3 +14,7 @@ native/*.jks
 native/android/*.jks
 dist/
 native/*.pem
+
+# generated listing assets (tools/store_assets.py, tools/promo_video.py); the text stays
+store/*
+!store/listing.md
