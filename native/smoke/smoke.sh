@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs the debug build on an Android emulator and checks that it starts, shows the app, restores its state file,
-# and survives an Auto Backup round trip (backup, wipe, restore). Records the first start as launch.mp4.
+# and survives an Auto Backup round trip (backup, wipe, restore). Then records a cold start as launch.mp4.
 # Used by .github/workflows/android.yml.
 # Usage: smoke.sh path/to/app-debug.apk
 set -euo pipefail
@@ -43,16 +43,9 @@ adb shell settings put global transition_animation_scale 0 || true
 adb shell settings put global animator_duration_scale 0 || true
 adb logcat -c || true
 
-# 1. Fresh install: the app starts on the company profile. The first start is recorded (launch.mp4), with
-#    animations on for it: the plain navy splash, then the launch animation, then the app.
+# 1. Fresh install: the app starts on the company profile.
 adb install -r "$APK"
-adb shell settings put global animator_duration_scale 1 || true
-timeout 45 adb shell screenrecord --time-limit 25 /sdcard/launch.mp4 > /dev/null 2>&1 &
-REC=$!
 launch 12
-wait "$REC" || true
-adb pull /sdcard/launch.mp4 "$OUT/launch.mp4" > /dev/null 2>&1 || echo "      (no launch recording on this emulator)"
-adb shell settings put global animator_duration_scale 0 || true
 screen 01-fresh
 crashed && fail "the app crashed on a fresh start"
 ok "fresh start, no crash"
@@ -99,5 +92,18 @@ echo "$UI" | grep -q "Hart Electric" || fail "after the restore the company is n
 ok "after the restore the app opens with its data"
 crashed && fail "a crash was logged during the run"
 adb logcat -d > "$OUT/logcat.txt" || true
+
+# 4. A recording of a cold start (launch.mp4): the plain navy splash, the launch animation, then the app. It comes
+#    after the checks, at half size, because recording loads the emulator enough to slow everything else down.
+adb shell am force-stop "$PKG"
+adb shell settings put global animator_duration_scale 1 || true
+sleep 8
+timeout 45 adb shell screenrecord --size 540x1200 --bit-rate 2000000 --time-limit 25 /sdcard/launch.mp4 > /dev/null 2>&1 &
+REC=$!
+sleep 1
+adb shell am start -n "$PKG/.MainActivity" > /dev/null || true
+wait "$REC" || true
+adb pull /sdcard/launch.mp4 "$OUT/launch.mp4" > /dev/null 2>&1 || echo "      (no launch recording on this emulator)"
+adb shell settings put global animator_duration_scale 0 || true
 echo
 echo "ALL PASSED"

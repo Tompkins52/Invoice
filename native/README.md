@@ -57,5 +57,6 @@ back `mipmap-anydpi-v26/ic_launcher.xml` and `ic_launcher_round.xml` (`git check
 ## Tests
 
 - `python3 tests/native_check.py` (after assembling): the app with the shell stubbed, in Chromium.
-- `native/smoke/smoke.sh app-debug.apk`: on an emulator or a phone with USB debugging. It records the first
-  start as `native/smoke/out/launch.mp4` (the splash, then the launch animation), kept with the run's artifacts.
+- `native/smoke/smoke.sh app-debug.apk`: on an emulator or a phone with USB debugging. After the checks it
+  records a cold start as `native/smoke/out/launch.mp4` (the splash, then the launch animation), kept with the
+  run's artifacts.
