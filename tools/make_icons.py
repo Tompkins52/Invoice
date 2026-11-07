@@ -1,4 +1,6 @@
 """Draws the app icons. Run from the repo root: python3 tools/make_icons.py
+With "android", writes the source images @capacitor/assets wants into native/assets instead
+(icon-only, icon-foreground, icon-background at 1024 and the splash at 2732).
 
 The mark is a billhead: a sheet of paper with the company's band across the top and the bill below it,
 on a navy tile. One SVG, rendered with the bundled Chromium (Playwright) at each size."""
@@ -36,17 +38,42 @@ def svg(size, pad, rounded):
              x + sheet_w * 0.16, y + band_h + sheet_h * 0.70, sheet_w * 0.68, sheet_h * 0.07, sheet_h * 0.035)
 
 
+def splash_svg(size):
+    # The mark (sheet only, no tile) in the middle of a navy field; the system splash shows the launcher icon the same way.
+    mark = 0.34
+    inner = svg(int(size * mark), 0.0, False).replace('<rect width="%d" height="%d" rx="0.0" fill="#1C3F7A"/>' % (int(size * mark), int(size * mark)), '')
+    off = size * (1 - mark) / 2
+    return ('<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d"><rect width="%d" height="%d" fill="#1C3F7A"/>'
+            '<g transform="translate(%.1f %.1f)">%s</g></svg>') % (size, size, size, size, size, size, off, off, inner)
+
+
+def render(b, markup, size, path, transparent):
+    page = b.new_page(viewport={'width': size, 'height': size}, device_scale_factor=1)
+    page.set_content('<html><body style="margin:0;background:transparent">' + markup + '</body></html>')
+    page.screenshot(path=path, omit_background=transparent, clip={'x': 0, 'y': 0, 'width': size, 'height': size})
+    page.close()
+    print(os.path.relpath(path, ROOT))
+
+
 def main():
-    os.makedirs(OUT, exist_ok=True)
-    jobs = [('icon-192.png', 192, 0.0, True), ('icon-512.png', 512, 0.0, True), ('apple-touch-icon.png', 180, 0.0, False), ('maskable-512.png', 512, 0.10, False)]
+    android = len(sys.argv) > 1 and sys.argv[1] == 'android'
     with sync_playwright() as pw:
         b = pw.chromium.launch()
+        if android:
+            out = os.path.join(ROOT, 'native', 'assets')
+            os.makedirs(out, exist_ok=True)
+            render(b, svg(1024, 0.0, False), 1024, os.path.join(out, 'icon-only.png'), False)
+            fg = svg(1024, 0.12, False).replace('<rect width="1024" height="1024" rx="0.0" fill="#1C3F7A"/>', '')
+            render(b, fg, 1024, os.path.join(out, 'icon-foreground.png'), True)
+            render(b, '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024"><rect width="1024" height="1024" fill="#1C3F7A"/></svg>', 1024, os.path.join(out, 'icon-background.png'), False)
+            render(b, splash_svg(2732), 2732, os.path.join(out, 'splash.png'), False)
+            render(b, splash_svg(2732), 2732, os.path.join(out, 'splash-dark.png'), False)
+            b.close()
+            return
+        os.makedirs(OUT, exist_ok=True)
+        jobs = [('icon-192.png', 192, 0.0, True), ('icon-512.png', 512, 0.0, True), ('apple-touch-icon.png', 180, 0.0, False), ('maskable-512.png', 512, 0.10, False)]
         for name, size, pad, rounded in jobs:
-            page = b.new_page(viewport={'width': size, 'height': size}, device_scale_factor=1)
-            page.set_content('<html><body style="margin:0;background:transparent">' + svg(size, pad, rounded) + '</body></html>')
-            page.screenshot(path=os.path.join(OUT, name), omit_background=True, clip={'x': 0, 'y': 0, 'width': size, 'height': size})
-            page.close()
-            print('icons/' + name)
+            render(b, svg(size, pad, rounded), size, os.path.join(OUT, name), True)
         b.close()
     open(os.path.join(OUT, 'mark.svg'), 'w').write(svg(64, 0.0, True))
 

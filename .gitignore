@@ -3,3 +3,14 @@ __pycache__/
 *.pyc
 .DS_Store
 site/
+native/node_modules/
+native/www/
+native/android/app/build/
+native/android/build/
+native/android/.gradle/
+native/android/local.properties
+native/android/capacitor-cordova-android-plugins/build/
+native/*.jks
+native/android/*.jks
+dist/
+native/*.pem

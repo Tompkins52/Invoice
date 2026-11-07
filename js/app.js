@@ -810,16 +810,19 @@
         return deliver(out, inv, share).then(function (how) {
           if (how === "cancelled") return;
           if (location.hash === "#/inv/" + inv.id || location.hash === "#/edit/" + inv.id) route();
-          toast(first ? "PDF ready. Marked as sent; change that under More on the invoice." : "PDF ready.");
+          var where = how === "downloaded" && savedWhere ? "Saved to " + savedWhere + "." : "PDF ready.";
+          savedWhere = "";
+          toast(first ? where + " Marked as sent; change that under More on the invoice." : where, how === "downloaded" && NATIVE ? 4200 : undefined);
         });
       });
     }).catch(function (e) { busy(null); toast("Could not make the PDF: " + (e && e.message ? e.message : e)); });
   }
+  var savedWhere = "";
   function deliver(out, inv, share) {
     if (NATIVE) {
       var title = "Invoice " + inv.num + (S.company.name ? " from " + S.company.name : "");
       if (share) return NATIVE.sharePdf(out.bytes, out.name, title).then(function () { return "shared"; }, function (e) { if (e && /cancel/i.test(String(e.message || e))) return "cancelled"; toast("Could not share: " + (e && e.message ? e.message : e)); return "cancelled"; });
-      return NATIVE.saveFile(out.bytes, out.name, "application/pdf").then(function (where) { toast("Saved to " + where, 4200); return "downloaded"; }, function (e) { toast("Could not save: " + (e && e.message ? e.message : e)); return "cancelled"; });
+      return NATIVE.saveFile(out.bytes, out.name, "application/pdf").then(function (where) { savedWhere = where; return "downloaded"; }, function (e) { toast("Could not save: " + (e && e.message ? e.message : e)); return "cancelled"; });
     }
     var blob = new Blob([out.bytes], { type: "application/pdf" });
     if (share && navigator.share) {
@@ -949,7 +952,7 @@
       '<a class="item" href="#/clients"><div><div class="t">Customers</div><div class="s">' + S.clients.length + " saved</div></div><div class=\"r\">›</div></a></div>" +
       '<div class="card"><h3>Look</h3><div class="chips" style="margin-top:0.5rem">' + [["auto", "Match the phone"], ["light", "Light"], ["dark", "Dark"]].map(function (l) { return '<button type="button" class="chip' + ((S.settings.look || "auto") === l[0] ? " on" : "") + '" data-setlook="' + l[0] + '">' + l[1] + "</button>"; }).join("") + "</div></div>" +
       (iosSafariTab() ? '<div class="card" style="border-color:var(--amber)"><h3>Keep it safe</h3><p class="small" style="margin-top:0.4rem">In Safari, tap Share, then <b>Add to Home Screen</b>. As a home-screen app, Billhead opens full screen and works offline, and Safari stops counting the days toward clearing its stored data (it clears a site\'s data after seven days without a visit). Keep a backup file either way.</p></div>' : "") +
-      '<div class="card"><h3>Backup</h3><p class="small muted" style="margin-top:0.4rem">Everything lives on this device only. A backup file holds your company, customers, projects and invoices; keep one somewhere safe, and use it to move to a new phone.</p><div class="row"><button type="button" class="btn" data-backup>Save a backup file</button><label class="btn file-btn">Restore from a backup<input type="file" accept=".json,application/json" data-restore></label>' + (S.invoices.length ? '<button type="button" class="btn" data-csv>Invoices as CSV</button>' : "") + "</div></div>" +
+      '<div class="card"><h3>Backup</h3><p class="small muted" style="margin-top:0.4rem">' + (NATIVE ? "Everything lives on this phone. When Google backup is on, Android backs the app up to your Google account and carries it to a new phone. A backup file is a second copy you control: keep one somewhere safe." : "Everything lives on this device only. A backup file holds your company, customers, projects and invoices; keep one somewhere safe, and use it to move to a new phone.") + '</p><div class="row"><button type="button" class="btn" data-backup>Save a backup file</button><label class="btn file-btn">Restore from a backup<input type="file" accept=".json,application/json" data-restore></label>' + (S.invoices.length ? '<button type="button" class="btn" data-csv>Invoices as CSV</button>' : "") + "</div></div>" +
       '<div class="card"><h3>Pricing</h3>' + (M.PRICING.mode === "free" ? '<p class="small" style="margin-top:0.4rem"><b>Free while the app is in testing.</b> The plan once it is not:</p>' : "") + pricingTable() +
       '<p class="small muted">No subscription, no account, no ads. Billhead charges for the invoice, never a percentage of what your customer pays you: a $1,000 invoice costs ' + M.priceText(M.PRICING.simple) + " to make, and your customer pays you however you like. Apps that are free to send often take 2.9 percent plus 60 cents when the customer pays by card through them, which is $29.60 on $1,000.</p></div>" +
       '<div class="card"><h3>About</h3><p class="small" style="margin-top:0.4rem"><b>' + M.NAME + "</b> by Tompkins Software Systems. A billhead is what printers called a business's invoice form a century ago: the name at the top, the bill below. Nothing you type leaves this device; there is no server and no account. PDFs are drawn on the phone and locked against editing. Build " + esc(build) + '.</p><p class="small muted">Type: IBM Plex (SIL Open Font License). PDF: jsPDF (MIT). Signatures: signature_pad (MIT).</p>' +
@@ -1010,7 +1013,7 @@
       var data; try { data = JSON.parse(text); } catch (e) { return; }
       if (!data || !data.company) return;
       var mine = S.savedAt || "", theirs = data.savedAt || "";
-      if (!S.company || theirs > mine) { S = M.normalize(data); M.save(S); applyLook(); route(); }
+      if (!S.company || theirs > mine) { S = M.normalize(data); M.save(S); applyLook(); if (/welcome/.test(currentHash())) go("#/"); else route(); }
     }).catch(function () { }).then(function () { NATIVE.ready(); });
     NATIVE.onBack(function () {
       if ($layer.querySelector(".sheet-wrap")) { closeSheet(); return; }

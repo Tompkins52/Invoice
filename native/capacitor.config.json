@@ -1,0 +1,26 @@
+{
+  "appId": "com.tompkinssoftwaresystems.billhead",
+  "appName": "Billhead",
+  "webDir": "www",
+  "backgroundColor": "#F3F5F8",
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": false,
+      "backgroundColor": "#1C3F7A",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_INSIDE",
+      "splashFullScreen": false,
+      "splashImmersive": false
+    },
+    "SystemBars": {
+      "insetsHandling": "css",
+      "initialViewportFitValueHint": "cover",
+      "style": "DEFAULT",
+      "hidden": false
+    }
+  }
+}
