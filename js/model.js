@@ -13,6 +13,7 @@
   M.PRICING = {
     mode: "free", currency: "USD",
     simple: 0.99, advanced: 1.99,
+    freeUnder: 100,
     firstFree: true,
     packs: [{ tier: "simple", count: 10, price: 7.99 }, { tier: "advanced", count: 10, price: 14.99 }, { tier: "advanced", count: 50, price: 49 }],
     pass: { price: 99, days: 365 }
@@ -207,11 +208,14 @@
   /* ---------- Storage (one JSON document in localStorage; a backup file is the same document) ---------- */
   M.KEY = "billhead.v1";
   M.blankState = function () { return { v: M.DATA_VERSION, company: null, clients: [], projects: [], invoices: [], credits: { simple: 0, advanced: 0 }, pass: { until: "" }, settings: { look: "auto", sounds: false, onboarded: false }, savedAt: "" }; };
-  /* How a download gets unlocked, in order: already unlocked, testing, the first invoice, a year pass, a pack credit, or pay. */
+  /* An invoice under the free limit (the total billed, before deposits and payments) never costs anything. */
+  M.isSmall = function (inv) { return !!M.PRICING.freeUnder && M.totals(inv).total < M.PRICING.freeUnder; };
+  /* How a download gets unlocked, in order: already unlocked, testing, under the free limit, the first invoice, a year pass, a pack credit, or pay. */
   M.unlockHow = function (state, inv, todayIso) {
     if (inv.unlock) return "unlocked";
     if (M.PRICING.mode === "free") return "free";
-    if (M.PRICING.firstFree && !(state.invoices || []).some(function (i) { return i.unlock && i.id !== inv.id; })) return "first";
+    if (M.isSmall(inv)) return "small";
+    if (M.PRICING.firstFree && !(state.invoices || []).some(function (i) { return i.unlock && i.unlock.how !== "small" && i.id !== inv.id; })) return "first";
     if (state.pass && state.pass.until && state.pass.until >= (todayIso || M.today())) return "pass";
     if (state.credits && M.num(state.credits[inv.tier]) > 0) return "credit";
     return "pay";

@@ -29,10 +29,18 @@ t("a simple invoice takes a discount and a deposit but not freight or retainage"
 
 t("downloads unlock in order: testing, first invoice, year pass, pack credit, then pay", () => {
   const state = M.blankState(); const a = M.blankInvoice(co, "simple"), b = M.blankInvoice(co, "advanced"); state.invoices = [a, b];
+  b.lines = [{ d: "Big job", q: 1, r: 2500 }];
   const saved = M.PRICING.mode;
   assert.strictEqual(M.unlockHow(state, a), "free");
   M.PRICING.mode = "paid";
-  assert.strictEqual(M.unlockHow(state, a), "first");
+  a.lines = [{ d: "Small job", q: 1, r: 60 }]; a.tax = 7.25;
+  assert.strictEqual(M.unlockHow(state, a), "small", "under $100 with tax is free, before the first-invoice freebie is used");
+  a.lines = [{ d: "Job", q: 1, r: 99.99 }]; a.tax = "";
+  assert.strictEqual(M.unlockHow(state, a), "small", "$99.99 is under the limit");
+  a.lines = [{ d: "Job", q: 1, r: 100 }];
+  assert.strictEqual(M.unlockHow(state, a), "first", "$100.00 is not under the limit");
+  const small = M.blankInvoice(co, "simple"); small.lines = [{ d: "S", q: 1, r: 20 }]; small.tax = ""; small.unlock = { how: "small" }; state.invoices.push(small);
+  assert.strictEqual(M.unlockHow(state, a), "first", "a free small invoice does not use up the first free invoice");
   a.unlock = { how: "first" };
   assert.strictEqual(M.unlockHow(state, a), "unlocked");
   assert.strictEqual(M.unlockHow(state, b), "pay");

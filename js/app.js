@@ -14,16 +14,22 @@
   var mainHandlers = {};
   function onMain(type, fn) { mainHandlers[type] = fn; }
   ["click", "input", "change", "keydown"].forEach(function (type) { $main.addEventListener(type, function (e) { if (mainHandlers[type]) mainHandlers[type](e); }); });
-  var canShareFiles = (function () { try { return !ART && !!(navigator.share && navigator.canShare && navigator.canShare({ files: [new File(["x"], "x.pdf", { type: "application/pdf" })] })); } catch (e) { return false; } })();
+  /* The Android and iOS apps load native.js first; it sets window.BHNative (files, the share sheet, the back button). */
+  var NATIVE = window.BHNative || null;
+  var canShareFiles = (function () { if (NATIVE) return true; try { return !ART && !!(navigator.share && navigator.canShare && navigator.canShare({ files: [new File(["x"], "x.pdf", { type: "application/pdf" })] })); } catch (e) { return false; } })();
   /* On a phone the share sheet is the way out (Save to Files, Mail, Messages, AirDrop); on a computer, a download. */
   function pdfButtons(primary) {
-    if (canShareFiles) return '<button type="button" class="btn ' + (primary || "primary") + '" data-share>' + I.share + ' Share PDF</button><button type="button" class="btn" data-pdf>' + I.down + " Download</button>";
+    if (canShareFiles) return '<button type="button" class="btn ' + (primary || "primary") + '" data-share>' + I.share + ' Share PDF</button><button type="button" class="btn" data-pdf>' + I.down + (NATIVE ? " Save to phone" : " Download") + "</button>";
     return '<button type="button" class="btn ' + (primary || "primary") + '" data-pdf>' + I.down + " Download PDF</button>";
   }
   var saveTimer = null;
   function save(now) {
     clearTimeout(saveTimer);
-    var run = function () { if (!M.save(S)) toast("Could not save on this device. Storage may be full or blocked."); };
+    var run = function () {
+      if (!M.save(S)) toast("Could not save on this device. Storage may be full or blocked.");
+      /* In the app, the same document also goes to a file in the app's own folder, which Android backs up and carries to a new phone. */
+      if (NATIVE) NATIVE.saveState(JSON.stringify(S)).catch(function () { });
+    };
     if (now) run(); else saveTimer = setTimeout(run, 300);
   }
   function currentHash() { return ART ? memHash : location.hash; }
@@ -32,7 +38,8 @@
   function projectById(id) { return S.projects.filter(function (p) { return p.id === id; })[0]; }
   function clientById(id) { return S.clients.filter(function (c) { return c.id === id; })[0]; }
   function clientName(id) { var c = clientById(id); return c ? c.name : ""; }
-  function applyLook() { document.documentElement.setAttribute("data-look", S.settings.look || "auto"); document.documentElement.classList.toggle("dark-auto", (S.settings.look || "auto") === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches); }
+  function isDark() { var l = S.settings.look || "auto"; return l === "dark" || (l === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches); }
+  function applyLook() { document.documentElement.setAttribute("data-look", S.settings.look || "auto"); document.documentElement.classList.toggle("dark-auto", (S.settings.look || "auto") === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches); if (NATIVE) NATIVE.setDark(isDark()).catch(function () { }); }
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyLook);
 
   /* ---------- Icons ---------- */
@@ -269,9 +276,10 @@
     var recent = S.invoices.slice().sort(function (a, b) { return (b.updatedAt || "").localeCompare(a.updatedAt || "") || (b.createdAt || "").localeCompare(a.createdAt || ""); }).slice(0, 5);
     var openProjects = S.projects.filter(function (p) { return p.status !== "closed"; }).slice(0, 3);
     $main.innerHTML = '<div class="view stack">' +
-      '<div class="card ledger"><div class="row between" style="margin-bottom:0.6rem"><h2>New invoice</h2><span class="small muted">' + (M.PRICING.mode === "free" ? "Free while in testing" : "") + "</span></div>" +
+      '<div class="card ledger"><div class="row between" style="margin-bottom:0.6rem"><h2>New invoice</h2><span class="small muted">' + (M.PRICING.mode === "free" ? "Free while in testing" : "Under " + M.priceText(M.PRICING.freeUnder) + ": free") + "</span></div>" +
       '<div class="choice"><button type="button" class="opt" data-new="simple"><div class="h"><span>Simple</span><span class="price">' + (M.PRICING.mode === "free" ? "<s>" + M.priceText(M.PRICING.simple) + "</s>Free" : M.priceText(M.PRICING.simple)) + '</span></div><div class="small muted">Who, what, how much, a discount or a deposit, when it is due, how to pay. One page.</div></button>' +
-      '<button type="button" class="opt adv" data-new="advanced"><div class="h"><span>Advanced</span><span class="price">' + (M.PRICING.mode === "free" ? "<s>" + M.priceText(M.PRICING.advanced) + "</s>Free" : M.priceText(M.PRICING.advanced)) + '</span></div><div class="small muted">Everything in simple, plus PO and job site, progress billing on a project, freight, retainage, late fees, your signature.</div></button></div></div>' +
+      '<button type="button" class="opt adv" data-new="advanced"><div class="h"><span>Advanced</span><span class="price">' + (M.PRICING.mode === "free" ? "<s>" + M.priceText(M.PRICING.advanced) + "</s>Free" : M.priceText(M.PRICING.advanced)) + '</span></div><div class="small muted">Everything in simple, plus PO and job site, progress billing on a project, freight, retainage, late fees, your signature.</div></button></div>' +
+      '<p class="small muted" style="margin:0.7rem 0 0">' + (M.PRICING.freeUnder ? "<b>Any invoice under " + M.priceText(M.PRICING.freeUnder) + " is free.</b> " : "") + "Pay once per invoice when you download it, never a subscription." + "</p></div>" +
       (S.invoices.length ? '<div class="stats"><div class="stat' + (outstanding ? "" : " green") + '"><div class="v">' + money(outstanding) + '</div><div class="l">Outstanding</div></div><div class="stat' + (overdue.length ? " red" : "") + '"><div class="v">' + overdue.length + '</div><div class="l">Overdue</div></div><div class="stat green"><div class="v">' + money(paidMonth) + '</div><div class="l">Paid this month</div></div></div>' : "") +
       (attention.length ? '<div><div class="section-head"><h2>Needs attention</h2></div><div class="list">' + attention.slice(0, 4).map(invoiceItem).join("") + "</div></div>" : "") +
       (recent.length ? '<div><div class="section-head"><h2>Recent</h2><a href="#/invoices" class="small">All invoices</a></div><div class="list">' + recent.map(invoiceItem).join("") + "</div></div>" : emptyState("No invoices yet. Pick Simple or Advanced above; the first one takes about two minutes.")) +
@@ -287,7 +295,7 @@
       $main.innerHTML = '<div class="view stack"><h1>Which kind?</h1><div class="choice">' +
         '<button type="button" class="opt" data-tier="simple"><div class="h"><span>Simple</span><span class="price">' + M.priceText(M.PRICING.simple) + '</span></div><ul><li>Your name or logo, the customer, a number and dates</li><li>Line items, one sales tax, a discount, a deposit, notes</li><li>How to pay you, with a pay link if you have one</li></ul></button>' +
         '<button type="button" class="opt adv" data-tier="advanced"><div class="h"><span>Advanced</span><span class="price">' + M.priceText(M.PRICING.advanced) + '</span></div><ul><li>Everything in simple</li><li>Purchase order, reference, job site, service period</li><li>Progress billing on a project: invoice 2 of 3, billed to date, remaining</li><li>Freight, retainage, late fee terms, tax per line</li><li>Your signature and a customer acceptance line</li></ul></button></div>' +
-        '<p class="small muted">' + (M.PRICING.mode === "free" ? "Both are free while the app is in testing. " : "Your first invoice is free. ") + "After that you pay once per invoice when you download it, or buy a pack; nothing renews on its own. A simple invoice can switch to advanced any time.</p></div>";
+        '<p class="small muted">' + (M.PRICING.freeUnder ? "Any invoice under " + M.priceText(M.PRICING.freeUnder) + " is free, whichever kind. " : "") + (M.PRICING.mode === "free" ? "Both are free while the app is in testing. " : "Your first invoice is free. ") + "After that you pay once per invoice when you download it, or buy a pack; nothing renews on its own. A simple invoice can switch to advanced any time.</p></div>";
       onMain("click", function (e) { var b = e.target.closest("[data-tier]"); if (b) go("#/new/" + b.getAttribute("data-tier") + (projectId ? "/" + projectId : "")); });
       return;
     }
@@ -498,7 +506,7 @@
     header(inv.num, { back: "#/inv/" + inv.id, actions: '<button type="button" class="btn small primary" data-go="#/inv/' + inv.id + '">Done</button>' });
     var pr = inv.projectId && projectById(inv.projectId);
     $main.innerHTML = '<div class="view wide">' +
-      '<div class="inv-bar"><span>' + (adv ? '<span class="pill adv">Advanced</span>' : '<span class="pill simple">Simple</span>') + " " + (M.PRICING.mode === "free" ? "Free while in testing (" + M.priceText(M.price(inv)) + " later)" : (M.unlockHow(S, inv) === "pay" ? "<b>" + M.priceText(M.price(inv)) + "</b> to download" : "Download included")) + '</span><span class="row" style="gap:0.3rem">' + (adv ? "" : '<button type="button" class="btn small" data-upgrade>Switch to advanced</button>') + '<button type="button" class="btn small" data-options>Options</button></span></div>' +
+      '<div class="inv-bar"><span>' + (adv ? '<span class="pill adv">Advanced</span>' : '<span class="pill simple">Simple</span>') + ' <span data-pricebar>' + priceBar(inv) + '</span></span><span class="row" style="gap:0.3rem">' + (adv ? "" : '<button type="button" class="btn small" data-upgrade>Switch to advanced</button>') + '<button type="button" class="btn small" data-options>Options</button></span></div>' +
       '<div class="inv-bar" data-projbar><span>' + (pr ? "Project: <b>" + esc(pr.name) + "</b>" + (inv.prog && inv.prog.on ? " · invoice " + esc(inv.prog.n) + " of " + esc(inv.prog.m) : "") : "Not on a project") + '</span><button type="button" class="btn small" data-project>' + (pr ? "Change" : "Add to a project") + "</button></div>" +
       (inv.status !== "draft" && inv.status !== "void" ? '<div class="inv-bar warn"><span>This invoice went out ' + esc(M.shortDate(inv.sentAt || inv.date)) + '. Changing it changes what you sent. For a correction, duplicate it as a new number instead.</span></div>' : "") +
       '<div class="inv-tools">' + pdfButtons() + '<span class="spacer"></span><button type="button" class="btn ghost small" data-go="#/ask/' + inv.id + '">Ask me instead</button></div>' +
@@ -511,6 +519,7 @@
       inv.lines.forEach(function (l, i) { var a = inv_el.querySelector('[data-amt="' + i + '"]'); if (a) a.innerHTML = money(M.lineAmount(l), cur) + (adv && l.t !== false && M.num(inv.tax) && inv.lines.some(function (x) { return x.t === false; }) ? '<span class="t">T</span>' : ""); });
       setText("[data-sub]", money(t.sub, cur)); setText("[data-taxbase]", money(t.taxBase, cur)); setText("[data-taxamt]", money(t.tax, cur)); setText("[data-total]", money(t.total, cur)); setText("[data-due]", money(t.due, cur)); setText("[data-retainamt]", "-" + money(t.retainAmt, cur)); setText("[data-paid]", "-" + money(t.paid, cur));
       var tr = inv_el.querySelector("[data-taxrow]"); if (tr) tr.hidden = !(M.num(inv.tax) && t.taxBase !== t.sub);
+      var pb = $main.querySelector("[data-pricebar]"); if (pb) pb.innerHTML = priceBar(inv);
       var pg = M.progress(inv); if (pg) { setText("[data-prog-this]", money(pg.thisInvoice, cur)); setText("[data-prog-billed]", money(pg.billed, cur)); setText("[data-prog-left]", money(pg.remaining, cur)); var bar = inv_el.querySelector("[data-prog-bar]"); if (bar) bar.style.width = pg.pct.toFixed(1) + "%"; }
     }
     function upgrade(k) {
@@ -588,6 +597,15 @@
     render();
   }
 
+  /* What this invoice will cost to download, as the editor's bar says it. */
+  function priceBar(inv) {
+    var how = M.unlockHow(S, inv), under = M.PRICING.freeUnder ? "under " + M.priceText(M.PRICING.freeUnder) : "";
+    if (M.PRICING.mode === "free") return M.isSmall(inv) ? "Free (" + under + ", and free while in testing)" : "Free while in testing (" + M.priceText(M.price(inv)) + " later)";
+    if (how === "small") return "<b>Free</b>, " + under;
+    if (how === "pay") return "<b>" + M.priceText(M.price(inv)) + "</b> to download";
+    if (how === "first") return "<b>Free</b>, your first invoice";
+    return "Download included";
+  }
   /* The invoice as HTML. edit: contenteditable with add links; otherwise a read-only preview. Used by the editor, the detail page and printing. */
   function invoiceHtml(inv, c, o) {
     o = o || {}; var edit = !!o.edit, adv = inv.tier === "advanced", cur = inv.currency, t = M.totals(inv), cu = inv.cust, show = inv.show || {};
@@ -712,7 +730,7 @@
     $main.innerHTML = '<div class="view wide stack">' +
       '<div class="card ledger"><div class="row between"><div><div class="row" style="gap:0.5rem">' + statusPill(inv) + '<span class="pill ' + (inv.tier === "advanced" ? "adv" : "simple") + '">' + inv.tier + '</span></div><div style="font-size:1.6rem;font-weight:600;margin-top:0.3rem" class="mono">' + money(st === "draft" || st === "paid" || st === "void" ? t.total : t.due, inv.currency) + '</div><div class="muted small">' + esc(inv.cust.name || "No customer yet") + " · " + esc(dueText(inv)) + (pr ? ' · <a href="#/project/' + pr.id + '">' + esc(pr.name) + "</a>" : "") + "</div></div></div>" +
       '<div class="row" style="margin-top:0.9rem">' + (st !== "void" ? pdfButtons() + (st !== "paid" && st !== "draft" ? '<button type="button" class="btn green" data-payment>' + I.check + " Record a payment</button>" : "") : "") + '<button type="button" class="btn" data-more>More</button></div>' +
-      (M.PRICING.mode === "free" ? '<p class="small muted" style="margin:0.7rem 0 0">Downloads are free while the app is in testing. Later, ' + M.priceText(M.price(inv)) + " once for this invoice (or a pack or a year pass); downloading it again is free.</p>" : "") + "</div>" +
+      (M.PRICING.mode === "free" ? '<p class="small muted" style="margin:0.7rem 0 0">Downloads are free while the app is in testing. Later, ' + (M.isSmall(inv) ? "this one stays free: it is under " + M.priceText(M.PRICING.freeUnder) + "." : M.priceText(M.price(inv)) + " once for this invoice (or a pack or a year pass); downloading it again is free.") + "</p>" : "") + "</div>" +
       ((inv.payments || []).length ? '<div class="card"><div class="section-head" style="margin-top:0"><h2>Payments</h2><span class="mono small">' + money(t.paid, inv.currency) + " of " + money(t.owed, inv.currency) + '</span></div><div class="list">' + inv.payments.map(function (p) { return '<div class="item" style="cursor:default"><div><div class="t">' + esc(p.method || "Payment") + (p.note ? ", " + esc(p.note) : "") + '</div><div class="s">' + esc(M.longDate(p.date)) + '</div></div><div class="r"><div class="amt">' + money(p.amount, inv.currency) + '</div><button type="button" class="btn-text quiet small" data-rmpay="' + p.id + '">Remove</button></div></div>'; }).join("") + "</div></div>" : "") +
       '<div class="inv readonly' + (inv.unlock ? "" : " locked") + '" data-inv style="--accent:' + esc(/^#[0-9a-f]{6}$/i.test(S.company.accent) ? S.company.accent : "#1C3F7A") + '">' + invoiceHtml(inv, S.company, { edit: false, slam: slam }) + "</div>" +
       '<p class="small muted">' + (inv.fingerprint ? "Invoice ID " + esc(inv.fingerprint) + " is printed on the PDF; it changes if the invoice changes, so a copy that comes back can be checked against this one. " : "") + "Created " + esc(M.longDate(inv.createdAt)) + (inv.sentAt ? ", sent " + esc(M.longDate(inv.sentAt)) : "") + (inv.paidAt ? ", paid " + esc(M.longDate(inv.paidAt)) : "") + ".</p></div>";
@@ -773,6 +791,7 @@
     if (how === "pay") return ask("Pay " + M.priceText(M.price(inv)) + " to download", "One payment unlocks this invoice for good; download it again any time. Packs and the year pass are cheaper per invoice. Payments are not switched on yet in this build.", [{ label: "OK", value: false }]);
     if (how === "credit") S.credits[inv.tier] = M.num(S.credits[inv.tier]) - 1;
     inv.unlock = { at: new Date().toISOString(), tier: inv.tier, how: how };
+    if (how === "small") toast("Under " + M.priceText(M.PRICING.freeUnder) + ", so this one is free.");
     if (how === "first") toast("Your first invoice is on us.");
     if (how === "credit") toast(S.credits[inv.tier] + " " + inv.tier + (S.credits[inv.tier] === 1 ? " invoice" : " invoices") + " left in your pack.");
     return Promise.resolve(true);
@@ -797,6 +816,11 @@
     }).catch(function (e) { busy(null); toast("Could not make the PDF: " + (e && e.message ? e.message : e)); });
   }
   function deliver(out, inv, share) {
+    if (NATIVE) {
+      var title = "Invoice " + inv.num + (S.company.name ? " from " + S.company.name : "");
+      if (share) return NATIVE.sharePdf(out.bytes, out.name, title).then(function () { return "shared"; }, function (e) { if (e && /cancel/i.test(String(e.message || e))) return "cancelled"; toast("Could not share: " + (e && e.message ? e.message : e)); return "cancelled"; });
+      return NATIVE.saveFile(out.bytes, out.name, "application/pdf").then(function (where) { toast("Saved to " + where, 4200); return "downloaded"; }, function (e) { toast("Could not save: " + (e && e.message ? e.message : e)); return "cancelled"; });
+    }
     var blob = new Blob([out.bytes], { type: "application/pdf" });
     if (share && navigator.share) {
       try {
@@ -809,6 +833,10 @@
     return Promise.resolve(download(blob, out.name));
   }
   function download(blob, name) {
+    if (NATIVE) {
+      return blob.arrayBuffer().then(function (buf) { return NATIVE.saveFile(buf, name, blob.type || "application/octet-stream"); })
+        .then(function (where) { toast("Saved to " + where, 4200); return "downloaded"; }, function (e) { toast("Could not save: " + (e && e.message ? e.message : e)); return "cancelled"; });
+    }
     if (ART) {
       return window.claude.use("downloads").then(function (d) { if (!d) throw new Error("Saving files is not available in this preview."); return d.save({ filename: name, data: blob }); })
         .then(function () { return "downloaded"; }, function (e) { if (e && e.code === "declined") return "cancelled"; toast("Could not save the file: " + (e && e.message ? e.message : e)); return "cancelled"; });
@@ -923,7 +951,7 @@
       (iosSafariTab() ? '<div class="card" style="border-color:var(--amber)"><h3>Keep it safe</h3><p class="small" style="margin-top:0.4rem">In Safari, tap Share, then <b>Add to Home Screen</b>. As a home-screen app, Billhead opens full screen and works offline, and Safari stops counting the days toward clearing its stored data (it clears a site\'s data after seven days without a visit). Keep a backup file either way.</p></div>' : "") +
       '<div class="card"><h3>Backup</h3><p class="small muted" style="margin-top:0.4rem">Everything lives on this device only. A backup file holds your company, customers, projects and invoices; keep one somewhere safe, and use it to move to a new phone.</p><div class="row"><button type="button" class="btn" data-backup>Save a backup file</button><label class="btn file-btn">Restore from a backup<input type="file" accept=".json,application/json" data-restore></label>' + (S.invoices.length ? '<button type="button" class="btn" data-csv>Invoices as CSV</button>' : "") + "</div></div>" +
       '<div class="card"><h3>Pricing</h3>' + (M.PRICING.mode === "free" ? '<p class="small" style="margin-top:0.4rem"><b>Free while the app is in testing.</b> The plan once it is not:</p>' : "") + pricingTable() +
-      '<p class="small muted">No subscription, no account, no ads. Billhead charges for the invoice and never takes a percentage of what your customer pays you: a $1,000 invoice costs ' + M.priceText(M.PRICING.simple) + " to make, and your customer pays you however you like. Apps that are free to send often take 2.9 percent plus 60 cents when the customer pays by card through them, which is $29.60 on $1,000.</p></div>" +
+      '<p class="small muted">No subscription, no account, no ads. Billhead charges for the invoice, never a percentage of what your customer pays you: a $1,000 invoice costs ' + M.priceText(M.PRICING.simple) + " to make, and your customer pays you however you like. Apps that are free to send often take 2.9 percent plus 60 cents when the customer pays by card through them, which is $29.60 on $1,000.</p></div>" +
       '<div class="card"><h3>About</h3><p class="small" style="margin-top:0.4rem"><b>' + M.NAME + "</b> by Tompkins Software Systems. A billhead is what printers called a business's invoice form a century ago: the name at the top, the bill below. Nothing you type leaves this device; there is no server and no account. PDFs are drawn on the phone and locked against editing. Build " + esc(build) + '.</p><p class="small muted">Type: IBM Plex (SIL Open Font License). PDF: jsPDF (MIT). Signatures: signature_pad (MIT).</p>' +
       '<div class="row"><a class="btn small" href="https://' + M.SITE + '/support.html#billhead" target="_blank" rel="noopener">Support</a><a class="btn small" href="https://' + M.SITE + '/privacy.html#billhead" target="_blank" rel="noopener">Privacy</a>' + (S.invoices.length ? "" : '<button type="button" class="btn small" data-sample>Load a sample company</button>') + '<button type="button" class="btn-text danger" data-forget>Forget everything on this device</button></div></div></div>';
     onMain("click", function (e) {
@@ -948,6 +976,7 @@
 
   function pricingTable() {
     var P = M.PRICING, rows = [];
+    if (P.freeUnder) rows.push(["Any invoice under " + M.priceText(P.freeUnder), "whatever kind, as many as you like", "Free"]);
     if (P.firstFree) rows.push(["Your first invoice", "", "Free"]);
     rows.push(["Simple invoice", "paid once, when you download it", M.priceText(P.simple)]); rows.push(["Advanced invoice", "paid once, when you download it", M.priceText(P.advanced)]);
     (P.packs || []).forEach(function (k) { rows.push([k.count + " " + k.tier + " invoices", M.priceText(Math.round(k.price / k.count * 100) / 100) + " each, never expire", M.priceText(k.price)]); });
@@ -974,7 +1003,23 @@
   var goParam = /[?&]go=([a-z-]+)/.exec(location.search);
   if (goParam && S.company && !ART) { history.replaceState(null, "", location.pathname + "#/new/" + goParam[1].replace("new-", "")); }
   route();
-  if (!ART && "serviceWorker" in navigator && location.protocol !== "file:") {
+  if (NATIVE) {
+    /* A fresh install restored from a phone backup has the file but not the browser storage: take the file. Otherwise the newer of the two wins. */
+    NATIVE.loadState().then(function (text) {
+      if (!text) return;
+      var data; try { data = JSON.parse(text); } catch (e) { return; }
+      if (!data || !data.company) return;
+      var mine = S.savedAt || "", theirs = data.savedAt || "";
+      if (!S.company || theirs > mine) { S = M.normalize(data); M.save(S); applyLook(); route(); }
+    }).catch(function () { }).then(function () { NATIVE.ready(); });
+    NATIVE.onBack(function () {
+      if ($layer.querySelector(".sheet-wrap")) { closeSheet(); return; }
+      var h = currentHash().replace(/^#\/?/, "");
+      if (!h || h === "home" || h === "welcome") { NATIVE.minimize(); return; }
+      if (history.length > 1) history.back(); else go("#/");
+    });
+  }
+  if (!ART && !NATIVE && "serviceWorker" in navigator && location.protocol !== "file:") {
     navigator.serviceWorker.register("sw.js").then(function (reg) {
       reg.addEventListener("updatefound", function () {
         var w = reg.installing; if (!w) return;
