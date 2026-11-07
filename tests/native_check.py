@@ -45,6 +45,7 @@ window.BHNative = {
   saveState: function (t) { __native.calls.push("saveState"); __native.state = t; return Promise.resolve(); },
   loadState: function () { __native.calls.push("loadState"); return Promise.resolve(__native.state); },
   sharePdf: function (bytes, name, title) { __native.calls.push("sharePdf:" + name + ":" + (bytes.byteLength || bytes.length) + ":" + title); return Promise.resolve({ activityType: "x" }); },
+  emailPdf: function (bytes, name, mail) { __native.calls.push("emailPdf:" + name + ":" + (bytes.byteLength || bytes.length) + ":" + mail.to + ":" + mail.subject); __native.mail = mail; return Promise.resolve({}); },
   saveFile: function (bytes, name, mime) { __native.calls.push("saveFile:" + name + ":" + (bytes.byteLength || bytes.length) + ":" + mime); return Promise.resolve("Documents/Billhead/" + name); },
   setDark: function (d) { __native.calls.push("setDark:" + d); return Promise.resolve(); },
   onBack: function (fn) { __native.backs.push(fn); },
@@ -112,6 +113,25 @@ with sync_playwright() as pw:
     page.wait_for_timeout(700)
     state = json.loads(page.evaluate('window.__native.state'))
     check(len(state.get('invoices', [])) == 1 and state['invoices'][0].get('unlock'), 'the state file has the invoice, unlocked')
+
+    # Send to customer: the email app with the PDF, the address and the message.
+    page.click('[data-send]')
+    page.wait_for_selector('.sheet [data-ok]')
+    check('Your email app opens with the PDF attached' in page.inner_text('.sheet'), 'the send sheet explains the email app hand-off')
+    check(page.input_value('.sheet [data-k="subject"]').startswith('Invoice INV-1001 from Hart Electric LLC'), 'the subject is filled in')
+    page.fill('.sheet [data-k="to"]', 'ap@prairiedental.example')
+    page.click('.sheet [data-ok]')
+    page.wait_for_function('window.__native.calls.some(function (x) { return x.indexOf("emailPdf:") === 0; })', timeout=30000)
+    em = [x for x in calls(page) if x.startswith('emailPdf:')][-1]
+    check('ap@prairiedental.example' in em and em.split(':')[1].endswith('.pdf') and int(em.split(':')[2]) > 10000, 'the email app gets the PDF, the address and the subject')
+    mail = page.evaluate('window.__native.mail')
+    check('Attached is invoice INV-1001 from Hart Electric LLC for $1,200.00' in mail['body'], 'the message names the invoice and the amount')
+    page.wait_for_selector('.toast')
+    check('Press Send in your email app' in page.inner_text('.toast'), 'the toast says to press Send')
+    page.wait_for_timeout(500)
+    check('Sent to ap@prairiedental.example on' in page.inner_text('body'), 'the invoice page logs the send')
+    state = json.loads(page.evaluate('window.__native.state'))
+    check(state['invoices'][0]['cust']['email'] == 'ap@prairiedental.example' and state['clients'][0]['email'] == 'ap@prairiedental.example', 'a new address is kept on the invoice and the customer')
 
     # Back button: a sheet closes first, then pages go back, then Home minimizes the app.
     page.goto(BASE + '#/more', wait_until='networkidle')

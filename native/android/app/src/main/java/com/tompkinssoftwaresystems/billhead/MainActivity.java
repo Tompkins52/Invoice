@@ -8,6 +8,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         // The app draws under the system bars; the web app pads its header and tab bar with the safe-area insets.
+        registerPlugin(MailPlugin.class);
         EdgeToEdge.enable(this);
         super.onCreate(savedInstanceState);
     }

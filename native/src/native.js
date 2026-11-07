@@ -2,11 +2,14 @@
    in the Android (and later iOS) build. It sets window.BHNative, which js/app.js uses when present:
    the state file that Android backs up and carries to a new phone, the share sheet, saving a PDF
    to the phone, the back button, the system bars and the splash screen. In a browser it does nothing. */
-import { Capacitor, SystemBars, SystemBarsStyle } from "@capacitor/core";
+import { Capacitor, SystemBars, SystemBarsStyle, registerPlugin } from "@capacitor/core";
 import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import { App } from "@capacitor/app";
 import { SplashScreen } from "@capacitor/splash-screen";
+
+/* Our own small plugin (android/.../MailPlugin.java): the email app with the PDF attached and the address filled in. */
+var BillheadMail = registerPlugin("BillheadMail");
 
 var STATE_PATH = "billhead/state.json";
 var SAVE_FOLDER = "Billhead";
@@ -28,6 +31,11 @@ async function writeTemp(bytes, name) {
 async function sharePdf(bytes, name, title) {
   var uri = await writeTemp(bytes, name);
   return Share.share({ title: title || name, dialogTitle: title || "Share invoice", files: [uri] });
+}
+
+async function emailPdf(bytes, name, mail) {
+  var uri = await writeTemp(bytes, name);
+  return BillheadMail.send({ to: mail.to || "", subject: mail.subject || "", body: mail.body || "", file: uri, name: safeName(name) });
 }
 
 async function saveFile(bytes, name, mime) {
@@ -81,6 +89,7 @@ if (Capacitor.isNativePlatform()) {
     saveState: saveState,
     loadState: loadState,
     sharePdf: sharePdf,
+    emailPdf: emailPdf,
     saveFile: saveFile,
     setDark: setDark,
     onBack: onBack,

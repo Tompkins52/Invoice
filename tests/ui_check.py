@@ -163,6 +163,19 @@ with sync_playwright() as pw:
     check('sent' in page.inner_text('.pill').lower(), 'downloading marks the invoice sent')
     shot(page, '06-invoice-detail')
 
+    # ---------- Send to customer (browser: the PDF downloads, then the email opens with the details) ----------
+    page.click('[data-send]')
+    page.wait_for_selector('.sheet [data-ok]')
+    check(page.input_value('.sheet [data-k="to"]') == 'ap@lakesidedental.example', 'the send sheet is addressed to the customer')
+    check('The PDF downloads, then your email opens' in page.inner_text('.sheet'), 'in a browser the sheet says the PDF downloads first')
+    with page.expect_download() as dl:
+        page.click('.sheet [data-ok]')
+    check(dl.value.suggested_filename.endswith('.pdf'), 'sending downloads the PDF for the email')
+    page.wait_for_selector('.toast')
+    check('attach it and press Send' in page.inner_text('.toast'), 'the toast says to attach the PDF')
+    page.wait_for_timeout(600)
+    check('Sent to ap@lakesidedental.example on' in page.inner_text('body'), 'the invoice page logs the send')
+
     # ---------- Record a payment ----------
     page.click('[data-payment]')
     page.wait_for_selector('[data-ok]')

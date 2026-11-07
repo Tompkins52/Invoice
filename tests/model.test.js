@@ -166,4 +166,22 @@ t("an invoice from TSS Invoice Creator comes over with its company, and the tier
   assert.strictEqual(M.decodeImport("not-base64!"), null);
 });
 
+t("the email to the customer carries the number, the amount due, the due date, the PO and how to pay", () => {
+  const c = M.sampleCompany(); const inv = M.sampleInvoice(c, "advanced");
+  inv.num = "INV-1050"; inv.due = "2026-12-07"; inv.po = "4471"; inv.cust.email = "ap@lakesidedental.example"; inv.cust.attn = "";
+  inv.lines = [{ d: "Panel", q: 1, u: "", r: 1000, t: false }]; inv.tax = ""; inv.disc = ""; inv.deposit = ""; inv.freight = ""; inv.retain = ""; inv.payments = [{ id: "p", date: "2026-11-01", amount: 250, method: "Check", note: "" }];
+  inv.prog = { on: true, contract: 9600, n: 2, m: 3, prev: 3200 }; inv.pay.link = "https://pay.example/hart";
+  const d = M.emailDraft(inv, c);
+  assert.strictEqual(d.to, "ap@lakesidedental.example");
+  assert.strictEqual(d.subject, "Invoice INV-1050 from Hart Electric LLC (PO 4471)");
+  assert.ok(d.body.startsWith("Hello Lakeside Dental,"), "greets the customer when there is no attention line");
+  assert.ok(d.body.includes("for $750.00, due December 7, 2026"), "the balance after the payment, and the due date: " + d.body);
+  assert.ok(d.body.includes("invoice 2 of 3 on the project ($9,600.00 contract)"));
+  assert.ok(d.body.includes("Your PO 4471.") && d.body.includes("Pay online: https://pay.example/hart") && d.body.endsWith("(555) 010-0142  office@hartelectric.example"));
+  inv.po = "P.O. 9"; inv.cust.attn = "Dana";
+  const d2 = M.emailDraft(inv, c);
+  assert.ok(d2.subject.endsWith("(P.O. 9)") && d2.body.startsWith("Hi Dana,"), "a PO written with the letters already is not doubled");
+  assert.ok(Array.isArray(M.blankInvoice(c, "simple").sends), "a new invoice has an empty send log");
+});
+
 setTimeout(() => console.log("\n" + n + " checks passed"), 50);

@@ -86,7 +86,7 @@
       lines: [M.blankLine()], disc: "", discPct: false, tax: c.taxRate === "" || c.taxRate == null ? "" : c.taxRate, taxLabel: c.taxLabel || "Sales tax", freight: "", deposit: "", retain: "",
       prog: { on: false, contract: "", n: 1, m: 2, prev: "" }, pay: { to: c.payTo || "", instr: c.payInstr || "", link: c.payLink || "", late: c.late || "", notes: c.notes || "" }, fine: c.fine || "",
       sig: { on: false, png: "", name: "", title: "", date: "" }, accept: false, currency: c.currency || "USD", vatLabel: c.vatLabel || "", vat: c.vat || "", showTaxid: false,
-      show: {}, payments: [], unlock: null, sentAt: "", paidAt: "", fingerprint: "", createdAt: date, updatedAt: date };
+      show: {}, payments: [], sends: [], unlock: null, sentAt: "", paidAt: "", fingerprint: "", createdAt: date, updatedAt: date };
   };
 
   /* ---------- Math ---------- */
@@ -131,6 +131,25 @@
     return u;
   };
   M.price = function (inv) { return inv.tier === "advanced" ? M.PRICING.advanced : M.PRICING.simple; };
+  /* The email that goes with an invoice: to the customer, subject and a short message. The app hands it to the
+     phone's email app with the PDF attached; the person can change any of it before it goes. */
+  M.emailDraft = function (inv, company) {
+    var c = company || {}, t = M.totals(inv), nl = "\n";
+    var attn = (inv.cust.attn || "").trim(), name = (inv.cust.name || "").trim();
+    var amount = M.money(t.due > 0 ? t.due : t.total, inv.currency);
+    var po = (inv.po || "").trim(), poText = /^p\.?o\.?\b/i.test(po) ? po : "PO " + po;
+    var lines = [attn ? "Hi " + attn + "," : (name ? "Hello " + name + "," : "Hello,")];
+    lines.push("", "Attached is invoice " + inv.num + (c.name ? " from " + c.name : "") + " for " + amount + (inv.due ? ", due " + M.longDate(inv.due) : "") + ".");
+    if (inv.prog && inv.prog.on && inv.prog.m > 1) lines.push("This is invoice " + inv.prog.n + " of " + inv.prog.m + " on the project" + (M.num(inv.prog.contract) ? " (" + M.money(M.num(inv.prog.contract), inv.currency) + " contract)" : "") + ".");
+    if (po) lines.push("Your " + poText + ".");
+    var pay = inv.pay || {};
+    if (pay.instr) lines.push("", "How to pay: " + pay.instr);
+    if (pay.link) lines.push("Pay online: " + pay.link);
+    lines.push("", "Thank you,", c.name || "");
+    var contact = [c.phone, c.email].filter(Boolean).join("  ");
+    if (contact) lines.push(contact);
+    return { to: inv.cust.email || "", subject: "Invoice " + inv.num + (c.name ? " from " + c.name : "") + (po ? " (" + poText + ")" : ""), body: lines.join(nl) };
+  };
   M.priceText = function (n) { return n < 1 ? Math.round(n * 100) + "¢" : "$" + n.toFixed(2); };
 
   /* Status as the app shows it. Draft until the PDF is made; then sent, partial, paid, or overdue by the due date. */
