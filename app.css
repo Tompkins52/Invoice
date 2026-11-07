@@ -379,16 +379,17 @@ body.has-tabs .toast { bottom: calc(var(--tab-h) + 16px + env(safe-area-inset-bo
 .uf-w1, .uf-w2 { opacity: 0; }
 .uf-w2 { color: #F3F5F8; }
 /* Each part of a mark is its own small SVG (placed in percent of its mark), so only transforms and opacity move
-   and the phone's graphics chip runs the motion even while the page's main thread is busy starting the app. */
+   and the phone's graphics chip runs the motion even while the page's main thread is busy starting the app. Parts
+   start at a scale of 0.001, not 0: at exactly 0 the browser may skip drawing them, and the chip would grow an empty layer. */
 .uf-mark { position: relative; flex: none; width: 168px; height: 243.26px; }
 .uf-fam { position: relative; flex: none; width: 56px; height: 56px; }
 .uf-mark > svg, .uf-fam > svg, .uf-wipe { position: absolute; display: block; overflow: visible; }
 .uf-wipe { overflow: hidden; }
 .uf-wipe b { position: absolute; inset: 0; background: #1C3F7A; }
 .uf-intro .bh-sheet { opacity: 0; transform: translateY(6%); }
-.uf-intro .bh-st, .uf-st { transform-origin: 50% 0; transform: scaleY(0); }
-.uf-intro .bh-line, .uf-intro .bh-total { transform-origin: 0 50%; transform: scaleX(0); }
-.uf-hd { transform: scale(0); }
+.uf-intro .bh-st, .uf-st { transform-origin: 50% 0; transform: scaleY(0.001); }
+.uf-intro .bh-line, .uf-intro .bh-total { transform-origin: 0 50%; transform: scaleX(0.001); }
+.uf-hd { transform: scale(0.001); }
 .uf-go .bh-sheet { animation: ufUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) 0.15s forwards; }
 .uf-go .bh-st { animation: ufDrop 0.5s cubic-bezier(0.34, 1.45, 0.64, 1) forwards; animation-delay: calc(0.5s + var(--i) * 0.08s); }
 .uf-go .bh-line { animation: ufGrow 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; animation-delay: calc(0.85s + var(--i) * 0.07s); }
