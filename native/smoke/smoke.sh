@@ -24,7 +24,8 @@ ui_text() {
   adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
   adb shell cat /sdcard/ui.xml 2>/dev/null || true
 }
-crashed() { adb logcat -d | grep -E "FATAL EXCEPTION|Process $PKG .* has died" | grep -q . ; }
+# A crash in our process; "has died" lines are expected when the script stops or clears the app itself.
+crashed() { adb logcat -d | grep -E "FATAL EXCEPTION" | grep -q . ; }
 
 adb wait-for-device
 adb shell settings put global window_animation_scale 0 || true
@@ -57,6 +58,8 @@ echo "$UI" > "$OUT/02-text.txt"
 echo "$UI" | grep -q "Hart Electric" || fail "the company from the state file is not on screen"
 echo "$UI" | grep -q "INV-1043" || fail "the invoice from the state file is not on screen"
 ok "the state file restores the company and its invoice"
+python3 "$HERE/check_shot.py" "$OUT/02-from-state-file.png" || fail "the app header is not where it should be"
+ok "the app's own header sits under the status bar, no Android title bar"
 
 # 3. Auto Backup round trip through the local transport: back up, wipe the app, restore, launch.
 adb shell bmgr enable true
