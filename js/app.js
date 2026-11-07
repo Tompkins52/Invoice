@@ -1098,7 +1098,9 @@
     if (NATIVE) NATIVE.setDark(true).catch(function () { });
     el.addEventListener("animationend", function (e) { if (e.target === el && /^uf(Out|Skip|Gone)$/.test(e.animationName)) end(); });
     el.addEventListener("click", function () { el.classList.add("uf-skip"); setTimeout(end, 400); });
-    setTimeout(end, 3600);
+    /* The end comes from the fade's animationend. The motion starts with the first frame actually drawn, which on a
+       slow phone can be seconds after this call, so the backstop timer is long (the faded markup is hidden anyway). */
+    setTimeout(end, 10000);
     el.classList.add("uf-go");
   }
 
