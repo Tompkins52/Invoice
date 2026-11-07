@@ -47,7 +47,7 @@ adb logcat -c || true
 #    animations on for it: the plain navy splash, then the launch animation, then the app.
 adb install -r "$APK"
 adb shell settings put global animator_duration_scale 1 || true
-timeout 30 adb shell screenrecord --time-limit 10 /sdcard/launch.mp4 > /dev/null 2>&1 &
+timeout 45 adb shell screenrecord --time-limit 25 /sdcard/launch.mp4 > /dev/null 2>&1 &
 REC=$!
 launch 12
 wait "$REC" || true

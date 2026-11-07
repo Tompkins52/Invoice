@@ -1079,6 +1079,9 @@
      drawn; in the Android app that is when the splash lifts. The status bar icons go light over the navy meanwhile.
      A tap skips it; when it ends the markup is removed. */
   var introStarted = false;
+  /* Two frames after the splash is told to lift: the shell holds the page's drawing until then, so the animation
+     starts when the page is really on screen, not underneath the splash on a slow phone. */
+  function introAfterSplash() { requestAnimationFrame(function () { requestAnimationFrame(intro); }); }
   function intro() {
     var el = document.getElementById("uf-intro");
     if (introStarted || !el) return;
@@ -1114,9 +1117,9 @@
       if (!data || !data.company) return;
       var mine = S.savedAt || "", theirs = data.savedAt || "";
       if (!S.company || theirs > mine) { S = M.normalize(data); M.save(S); applyLook(); if (/welcome/.test(currentHash())) go("#/"); else route(); }
-    }).catch(function () { }).then(function () { NATIVE.ready(); intro(); });
+    }).catch(function () { }).then(function () { NATIVE.ready(); introAfterSplash(); });
     /* The shell lifts the splash by itself after 4 seconds if the state file never answers; start the animation then too. */
-    setTimeout(intro, 4000);
+    setTimeout(introAfterSplash, 4000);
     NATIVE.onBack(function () {
       if ($layer.querySelector(".sheet-wrap")) { closeSheet(); return; }
       var h = currentHash().replace(/^#\/?/, "");
