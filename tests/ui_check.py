@@ -323,7 +323,7 @@ with sync_playwright() as pw:
     import make_icons
     html = open(os.path.join(ROOT, 'index.html'), encoding='utf-8').read()
     appjs = open(os.path.join(ROOT, 'js', 'app.js'), encoding='utf-8').read()
-    check(make_icons.mark() in html, 'the launch animation draws the same mark as the icons')
+    check(make_icons.intro_mark() in html, 'the launch animation draws the same mark as the icons')
     check(_re.sub(r' class="[^"]*"| style="--i:\d"', '', make_icons.mark()) in appjs, 'the mark in the header is the same drawing as the icons')
     lctx = browser.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=1)
     lpage = lctx.new_page()

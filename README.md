@@ -32,7 +32,7 @@ Web app, installable from the browser (Add to Home Screen). App Store and Google
 | `fonts/` | IBM Plex Sans and IBM Plex Mono (SIL Open Font License): woff2 for the screen, subset TTF for the PDF. |
 | `manifest.webmanifest`, `sw.js`, `icons/` | Home-screen install and offline use. The service worker caches the whole shell under one version and serves every page load from it. |
 | `tools/stamp_sw.py` | Run by the deploy: stops if a cached file is missing, sets the worker's VERSION to a hash of the shell, stamps the build into the page. |
-| `tools/make_icons.py` | Draws the icons: the mark on a 1024 grid, rendered with Playwright at each size (`android` for the shell's source images). The launch animation in `index.html` and the header mark in `js/app.js` are the same drawing; `tests/ui_check.py` checks they match. |
+| `tools/make_icons.py` | Draws the icons: the mark on a 1024 grid, rendered with Playwright at each size (`android` for the shell's source images). It also writes the launch animation's mark into `index.html`, one small SVG per part so the motion runs on the graphics chip; the header mark in `js/app.js` is the same drawing, and `tests/ui_check.py` checks both. |
 | `tests/model.test.js` | Math and records. `node tests/model.test.js` |
 | `tests/ui_check.py` | Walks the app in headless Chromium: profile, a simple invoice by questions and on the page, an advanced invoice on a progress project with a signature and retainage, a payment, the second invoice on the project, a backup, a reload, the desktop layout, the launch animation; and opens each PDF with pypdf to confirm encryption, permissions, text, logo and signature. `python3 tests/ui_check.py --shots` keeps screenshots in `tests/shots/`. |
 
