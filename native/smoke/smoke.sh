@@ -12,9 +12,18 @@ mkdir -p "$OUT"
 fail() { echo "FAIL  $1"; adb logcat -d > "$OUT/logcat.txt" || true; exit 1; }
 ok() { echo "ok    $1"; }
 
+# Start the app and wait for it. The emulator's Google Play services die now and then and take the app with
+# them ("depends on provider ...FontsProvider in dying proc"), which no real phone does; start again if so.
+in_front() { adb shell dumpsys activity activities 2>/dev/null | grep -q "ResumedActivity.*$PKG"; }
 launch() {
-  adb shell am start -W -n "$PKG/.MainActivity" > /dev/null
-  sleep "${1:-10}"
+  local n
+  for n in 1 2 3; do
+    adb shell am start -W -n "$PKG/.MainActivity" > /dev/null
+    sleep "${1:-10}"
+    in_front && return 0
+    echo "      (the app was not in front after start $n; starting it again)"
+  done
+  return 1
 }
 screen() { adb exec-out screencap -p > "$OUT/$1.png"; }
 # The page text, read through the WebView's remote debugging; uiautomator's dump as a fallback.
