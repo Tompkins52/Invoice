@@ -11,7 +11,9 @@ The Android app is the web app in a Capacitor shell: the same `index.html`, `app
 - the back button, the system bars (edge to edge; the web app pads its header and tab bar with the
   safe-area insets) and the splash screen, which is plain navy (no icon, `windowSplashScreenAnimatedIcon`
   is transparent in `res/values/styles.xml`) and stays up until the first screen is drawn; then the app's
-  own launch animation shows the mark (see the main README)
+  own launch animation shows the mark (see the main README). It goes without a fade (`launchFadeOutDuration` 0 in
+  `capacitor.config.json`): the animation starts on the same navy, and a fade would be run by the app's main thread,
+  which is busiest right then and on a slow phone kept the splash up over the animation
 
 Nothing in the web app changes for the browser: `js/app.js` looks for `window.BHNative` and uses the
 normal download and share paths when it is not there.
