@@ -60,10 +60,10 @@ def page_html():
     return """<!DOCTYPE html><html><head><meta charset="utf-8"><style>
 """ + font_css() + """
 * { box-sizing: border-box; }
-body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: linear-gradient(135deg, #1C3F7A 0%, #122A52 100%); font-family: 'Plex Sans', sans-serif; color: #fff; -webkit-font-smoothing: antialiased; position: relative; }
+body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: linear-gradient(135deg, #172E4E 0%, #0F2038 100%); font-family: 'Plex Sans', sans-serif; color: #fff; -webkit-font-smoothing: antialiased; position: relative; }
 .blob { position: absolute; border-radius: 50%; background: rgba(255,255,255,0.06); }
 #title, #end { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.mark { width: 230px; height: 230px; border-radius: 52px; background: #1C3F7A; box-shadow: 0 30px 80px rgba(0,0,0,0.4); overflow: hidden; }
+.mark { width: 230px; height: 230px; border-radius: 52px; background: #172E4E; box-shadow: 0 30px 80px rgba(0,0,0,0.4); overflow: hidden; }
 .mark img { width: 230px; height: 230px; display: block; }
 .name { font-size: 150px; font-weight: 700; letter-spacing: -0.025em; line-height: 1; margin-top: 34px; }
 .tag { font-size: 46px; color: rgba(255,255,255,0.84); margin-top: 22px; }

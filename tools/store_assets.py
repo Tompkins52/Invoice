@@ -129,7 +129,7 @@ def captioned(b, base):
             continue
         img = data_url(os.path.join(RAW, name + '.png'))
         html = '<html><head><style>' + font_css() + """
-          body { width: 1080px; height: 1920px; background: linear-gradient(160deg, #1C3F7A 0%, #122A52 100%); position: relative; overflow: hidden; color: #fff; }
+          body { width: 1080px; height: 1920px; background: linear-gradient(160deg, #172E4E 0%, #0F2038 100%); position: relative; overflow: hidden; color: #fff; }
           .blob { position: absolute; border-radius: 50%; background: rgba(255,255,255,0.06); }
           .cap { position: absolute; left: 80px; right: 80px; top: 96px; }
           h1 { margin: 0; font-size: 76px; line-height: 1.08; font-weight: 700; letter-spacing: -0.015em; }
@@ -153,9 +153,9 @@ def icon_and_feature(b, base):
     mark = data_url(os.path.join(ROOT, 'native', 'assets', 'icon-only.png'))
     home = data_url(os.path.join(RAW, '01-home.png'))
     html = '<html><head><style>' + font_css() + """
-      body { width: 1024px; height: 500px; background: linear-gradient(135deg, #1C3F7A 0%, #122A52 100%); position: relative; overflow: hidden; color: #fff; }
+      body { width: 1024px; height: 500px; background: linear-gradient(135deg, #172E4E 0%, #0F2038 100%); position: relative; overflow: hidden; color: #fff; }
       .blob { position: absolute; border-radius: 50%; background: rgba(255,255,255,0.06); }
-      .mark { position: absolute; left: 56px; top: 118px; width: 150px; height: 150px; background: #1C3F7A; border-radius: 34px; box-shadow: 0 16px 40px rgba(0,0,0,0.35); overflow: hidden; }
+      .mark { position: absolute; left: 56px; top: 118px; width: 150px; height: 150px; background: #172E4E; border-radius: 34px; box-shadow: 0 16px 40px rgba(0,0,0,0.35); overflow: hidden; }
       .mark img { width: 150px; height: 150px; display: block; }
       .name { position: absolute; left: 236px; top: 128px; font-size: 92px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
       .tag { position: absolute; left: 240px; top: 240px; font-size: 32px; color: rgba(255,255,255,0.84); line-height: 1.3; }

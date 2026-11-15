@@ -319,12 +319,12 @@ with sync_playwright() as pw:
 
     # ---------- The launch animation (the Upfront for Small Business family's) ----------
     sys.path.insert(0, os.path.join(ROOT, 'tools'))
-    import re as _re
     import make_icons
     html = open(os.path.join(ROOT, 'index.html'), encoding='utf-8').read()
     appjs = open(os.path.join(ROOT, 'js', 'app.js'), encoding='utf-8').read()
     check(make_icons.intro_mark() in html, 'the launch animation draws the same mark as the icons')
-    check(_re.sub(r' class="[^"]*"| style="--i:\d"', '', make_icons.mark()) in appjs, 'the mark in the header is the same drawing as the icons')
+    check(make_icons.intro_family() in html, 'and the family mark comes from the same drawing script')
+    check(make_icons.header_mark() in appjs, 'the mark in the header is the same drawing as the icons')
     lctx = browser.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=1)
     lpage = lctx.new_page()
     lpage.on('pageerror', lambda e: errors.append(str(e)))
@@ -336,6 +336,20 @@ with sync_playwright() as pw:
     check(lpage.evaluate('!!document.elementFromPoint(195, 422).closest("#uf-intro")'), 'it covers the app while it plays')
     words = lpage.inner_text('#uf-intro')
     check('Billhead' in words and 'Upfront for Small Business' in words, 'it shows Billhead, then by Upfront for Small Business')
+    # When every part has finished moving, the two marks are the drawings themselves: nothing shifted, scaled or
+    # faded, and the strokes that jump out from under the stamp are gone again.
+    moving = lpage.evaluate('''() => {
+      var parts = Array.prototype.slice.call(document.querySelectorAll("#uf-intro .uf-mark > svg, #uf-intro .uf-fam > svg"));
+      var done = [];
+      parts.forEach(function (p) { p.getAnimations().forEach(function (a) { done.push(a.finished); }); });
+      return Promise.all(done).then(function () {
+        return parts.filter(function (p) {
+          var s = getComputedStyle(p), still = s.transform === "none" || s.transform === "matrix(1, 0, 0, 1, 0, 0)";
+          return p.classList.contains("bh-burst") ? s.opacity !== "0" : !(still && s.opacity === "1");
+        }).map(function (p) { return p.getAttribute("class"); });
+      });
+    }''')
+    check(moving == [], 'it ends on the finished marks, every part at rest' + ('' if moving == [] else ' (not: %s)' % ', '.join(moving)))
     lpage.wait_for_selector('#uf-intro', state='detached', timeout=6000)
     took = time.time() - t0
     check(2.4 < took < 4.2, 'it ends by itself in about 3 seconds (%.1f s)' % took)
