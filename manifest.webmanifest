@@ -6,7 +6,7 @@
   "scope": "./",
   "display": "standalone",
   "background_color": "#F3F5F8",
-  "theme_color": "#1C3F7A",
+  "theme_color": "#172E4E",
   "lang": "en-US",
   "categories": ["business", "finance", "productivity"],
   "icons": [

@@ -51,7 +51,7 @@ Signing by hand: set `BILLHEAD_KEYSTORE_FILE`, `BILLHEAD_KEYSTORE_PASSWORD`, `BI
 `BILLHEAD_KEY_PASSWORD` in the environment before `gradlew`.
 
 Icons and splash: `python3 tools/make_icons.py android` draws the source images into `native/assets/`,
-then `npx capacitor-assets generate --android --iconBackgroundColor '#1C3F7A' --splashBackgroundColor '#1C3F7A'`.
+then `npx capacitor-assets generate --android --iconBackgroundColor '#172E4E' --splashBackgroundColor '#172E4E'`.
 The adaptive icon background is a solid color set in `res/values/ic_launcher_background.xml`: afterwards put
 back `mipmap-anydpi-v26/ic_launcher.xml` and `ic_launcher_round.xml` (`git checkout` them) and delete the
 `mipmap-*/ic_launcher_background.png` files the tool adds. The splash images are plain navy.
