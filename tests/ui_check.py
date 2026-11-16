@@ -321,6 +321,23 @@ with sync_playwright() as pw:
     check('INV-2208' in ipage.inner_text('[data-inv]'), 'carrying the same invoice over again gives it the next number instead of a duplicate')
     ictx.close()
 
+    # ---------- Embedded in a preview: routes in memory, files to the host page ----------
+    pctx = browser.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=1)
+    pctx.add_init_script('window.BHPreview = { saved: [], save: function (name, blob) { this.saved.push(name + ":" + blob.size); return Promise.resolve(); } };')
+    ppage = pctx.new_page()
+    ppage.on('pageerror', lambda e: errors.append(str(e)))
+    ppage.goto(BASE, wait_until='networkidle')
+    ppage.click('[data-sample]')
+    ppage.wait_for_selector('.list .item')
+    check('Hart Electric' in ppage.inner_text('#hdr') and ppage.evaluate('location.hash') == '', 'in a preview the screens change without touching the address')
+    ppage.click('.list .item')
+    ppage.wait_for_selector('[data-pdf]')
+    ppage.click('[data-pdf]')
+    ppage.wait_for_function('window.BHPreview.saved.length > 0', timeout=30000)
+    saved = ppage.evaluate('window.BHPreview.saved[0]')
+    check(saved.split(':')[0].endswith('.pdf') and int(saved.split(':')[1]) > 10000, 'and a PDF goes to the page that hosts the preview (%s)' % saved.split(':')[0])
+    pctx.close()
+
     # ---------- The launch animation (the Upfront for Small Business family's) ----------
     sys.path.insert(0, os.path.join(ROOT, 'tools'))
     import make_icons

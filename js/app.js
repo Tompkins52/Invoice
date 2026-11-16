@@ -5,8 +5,9 @@
   "use strict";
   var M = window.BH, S = M.load();
   var $main = document.getElementById("main"), $hdr = document.getElementById("hdr"), $tabs = document.getElementById("tabs"), $layer = document.getElementById("layer");
-  /* Inside a claude.ai artifact preview the address bar is not ours, so routes live in memory there. */
-  var ART = !!(window.claude && typeof window.claude.use === "function"), memHash = "#/";
+  /* Embedded in a page that hosts a preview, the address bar is not ours, so routes live in memory there. That page
+     sets window.BHPreview = { save(name, blob) } before the app loads: where a file goes when there is no download. */
+  var ART = !!(window.BHPreview && typeof window.BHPreview.save === "function"), memHash = "#/";
   var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
   var money = function (n, cur) { return M.money(n, cur || (S.company && S.company.currency) || "USD"); };
   var sym = function (cur) { return (M.CURRENCIES[cur || (S.company && S.company.currency) || "USD"] || M.CURRENCIES.USD).symbol; };
@@ -952,7 +953,7 @@
         .then(function (where) { toast("Saved to " + where, 4200); return "downloaded"; }, function (e) { toast("Could not save: " + (e && e.message ? e.message : e)); return "cancelled"; });
     }
     if (ART) {
-      return window.claude.use("downloads").then(function (d) { if (!d) throw new Error("Saving files is not available in this preview."); return d.save({ filename: name, data: blob }); })
+      return Promise.resolve().then(function () { return window.BHPreview.save(name, blob); })
         .then(function () { return "downloaded"; }, function (e) { if (e && e.code === "declined") return "cancelled"; toast("Could not save the file: " + (e && e.message ? e.message : e)); return "cancelled"; });
     }
     var url = URL.createObjectURL(blob), a = document.createElement("a"); a.href = url; a.download = name; a.rel = "noopener"; document.body.appendChild(a); a.click();
