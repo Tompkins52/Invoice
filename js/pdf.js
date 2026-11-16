@@ -222,7 +222,7 @@
         doc.setPage(i); var fy = H - m - 8;
         doc.setDrawColor.apply(doc, rule); doc.setLineWidth(0.5); doc.line(m, fy - 10, W - m, fy - 10);
         font("normal", 7.2, light);
-        var q = c.name ? "Questions? " + [c.phone, c.email].filter(Boolean).join(" or ") : "";
+        var reach = [c.phone, c.email].filter(Boolean).join(" or "), q = reach ? "Questions? " + reach : "";
         textAt(q, m, fy);
         var right = (inv.fingerprint ? "Invoice ID " + inv.fingerprint + "   " : "") + (pages > 1 ? "Page " + i + " of " + pages + "   " : "") + "Made with " + M.NAME + ", " + M.SITE;
         textAt(right, W - m, fy, "right");

@@ -229,6 +229,14 @@
   M.blankState = function () { return { v: M.DATA_VERSION, company: null, clients: [], projects: [], invoices: [], credits: { simple: 0, advanced: 0 }, pass: { until: "" }, settings: { look: "auto", sounds: false, onboarded: false }, savedAt: "" }; };
   /* An invoice under the free limit (the total billed, before deposits and payments) never costs anything. */
   M.isSmall = function (inv) { return !!M.PRICING.freeUnder && M.totals(inv).total < M.PRICING.freeUnder; };
+  /* What a new invoice said when it was made: the app keeps this on the invoice (_new) and drops the invoice if
+     the person leaves it without changing anything, so nobody collects empty drafts or loses invoice numbers. */
+  M.draftSig = function (inv) {
+    var c = inv.cust || {}, p = inv.pay || {};
+    return JSON.stringify([inv.num, c.name, c.addr, c.email, (inv.lines || []).map(function (l) { return [l.d, M.num(l.q), M.num(l.r)]; }), inv.desc, inv.po, inv.ref, inv.ship,
+      M.num(inv.disc), M.num(inv.deposit), M.num(inv.freight), p.notes, inv.projectId, !!(inv.sig && inv.sig.on), (inv.payments || []).length]);
+  };
+  M.isUntouched = function (inv) { return !!inv._new && (inv.status === "draft" || !inv.status) && M.draftSig(inv) === inv._new; };
   /* How a download gets unlocked, in order: already unlocked, testing, under the free limit, the first invoice, a year pass, a pack credit, or pay. */
   M.unlockHow = function (state, inv, todayIso) {
     if (inv.unlock) return "unlocked";

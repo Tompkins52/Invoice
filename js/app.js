@@ -19,11 +19,12 @@
   var canShareFiles = (function () { if (NATIVE) return true; try { return !ART && !!(navigator.share && navigator.canShare && navigator.canShare({ files: [new File(["x"], "x.pdf", { type: "application/pdf" })] })); } catch (e) { return false; } })();
   /* On a phone the share sheet is the way out (Save to Files, Mail, Messages, AirDrop); on a computer, a download. */
   function pdfButtons(primary) {
-    if (canShareFiles) return '<button type="button" class="btn ' + (primary || "primary") + '" data-share>' + I.share + ' Share PDF</button><button type="button" class="btn" data-pdf>' + I.down + (NATIVE ? " Save to phone" : " Download") + "</button>";
-    return '<button type="button" class="btn ' + (primary || "primary") + '" data-pdf>' + I.down + " Download PDF</button>";
+    var cls = primary ? "btn primary" : "btn";
+    if (canShareFiles) return '<button type="button" class="' + cls + '" data-share>' + I.share + ' Share PDF</button><button type="button" class="btn" data-pdf>' + I.down + (NATIVE ? " Save to phone" : " Download") + "</button>";
+    return '<button type="button" class="' + cls + '" data-pdf>' + I.down + " Download PDF</button>";
   }
-  /* Send to customer first (the email app with the PDF attached), then the PDF on its own. */
-  function sendButtons() { return '<button type="button" class="btn primary" data-send>' + I.mail + " Send to customer</button>" + pdfButtons(""); }
+  /* Send to customer leads (the email app with the PDF attached); the PDF on its own follows as plain buttons. */
+  function sendButtons() { return '<button type="button" class="btn primary" data-send>' + I.mail + " Send to customer</button>" + pdfButtons(false); }
   var saveTimer = null;
   function save(now) {
     clearTimeout(saveTimer);
@@ -35,7 +36,10 @@
     if (now) run(); else saveTimer = setTimeout(run, 300);
   }
   function currentHash() { return ART ? memHash : location.hash; }
-  function go(hash) { if (ART) { memHash = hash; route(); return; } if (location.hash === hash) route(); else location.hash = hash; }
+  /* navNew: this move was started in the app (a button or a link), so the next screen opens at its top.
+     Without it the move is the back or forward button, and the screen returns to where the person left it. */
+  var navNew = false, lastHash = null, scrollMem = {};
+  function go(hash) { navNew = true; if (ART) { memHash = hash; route(); return; } if (location.hash === hash) route(); else location.hash = hash; }
   function invoiceById(id) { return S.invoices.filter(function (i) { return i.id === id; })[0]; }
   function projectById(id) { return S.projects.filter(function (p) { return p.id === id; })[0]; }
   function clientById(id) { return S.clients.filter(function (c) { return c.id === id; })[0]; }
@@ -103,11 +107,17 @@
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeSheet(); });
   document.addEventListener("click", function (e) {
     var g = e.target.closest("[data-go]"); if (g) { e.preventDefault(); go(g.getAttribute("data-go")); return; }
-    if (ART) { var a = e.target.closest('a[href^="#/"]'); if (a) { e.preventDefault(); go(a.getAttribute("href")); } }
+    var a = e.target.closest('a[href^="#/"]'); if (!a) return;
+    if (ART) { e.preventDefault(); go(a.getAttribute("href")); } else navNew = true;
   });
 
   /* ---------- Shared pieces ---------- */
-  function field(label, inner, help) { return '<div class="field"><label>' + esc(label) + "</label>" + inner + (help ? '<div class="help">' + help + "</div>" : "") + "</div>"; }
+  var fieldN = 0;
+  function field(label, inner, help) {
+    var id = "f" + (++fieldN), hid = help ? id + "h" : "";
+    inner = inner.replace(/<(input|textarea|select)\b/, function (m) { return m + ' id="' + id + '"' + (hid ? ' aria-describedby="' + hid + '"' : ""); });
+    return '<div class="field"><label for="' + id + '">' + esc(label) + "</label>" + inner + (help ? '<div class="help" id="' + hid + '">' + help + "</div>" : "") + "</div>";
+  }
   function input(k, v, attrs) { return '<input data-k="' + k + '" value="' + esc(v == null ? "" : v) + '" ' + (attrs || 'type="text"') + ">"; }
   function textarea(k, v, ph, rows) { return '<textarea data-k="' + k + '" rows="' + (rows || 3) + '" placeholder="' + esc(ph || "") + '">' + esc(v || "") + "</textarea>"; }
   function moneyInput(k, v, ph, cur) { return '<span class="money-in" data-sym="' + esc(sym(cur)) + '">' + input(k, v, 'type="text" inputmode="decimal" placeholder="' + esc(ph || "0.00") + '"') + "</span>"; }
@@ -149,9 +159,31 @@
     importDraft = got; return false;
   }
   function route() {
+    var from = lastHash, wasNew = navNew; navNew = false;
+    if (from != null) scrollMem[from] = window.scrollY || 0;
+    routeTo();
+    var now = currentHash();
+    if (now !== from) window.scrollTo(0, wasNew ? 0 : (scrollMem[now] || 0));
+    lastHash = now;
+  }
+  /* A new invoice nobody typed into is not kept: it would sit in the list as an empty draft and use up a number.
+     The one on screen is left alone. When the dropped invoice had the newest number, the number is given back. */
+  function dropUntouched(keepId) {
+    var dropped = false;
+    for (var i = S.invoices.length - 1; i >= 0; i--) {
+      var inv = S.invoices[i];
+      if (!inv._new || inv.id === keepId) continue;
+      if (!M.isUntouched(inv)) { delete inv._new; continue; }
+      if (S.company && inv.num === (S.company.prefix || "") + (M.num(S.company.next) - 1)) S.company.next = M.num(S.company.next) - 1;
+      S.invoices.splice(i, 1); dropped = true;
+    }
+    if (dropped) save(true);
+  }
+  function routeTo() {
     if (!ART && takeImport()) return;
     closeSheet(); mainHandlers = {};
     var h = currentHash().replace(/^#\/?/, ""), parts = h.split("/");
+    dropUntouched(parts[0] === "ask" || parts[0] === "edit" || parts[0] === "inv" ? parts[1] : "");
     if (!S.company) { if (parts[0] !== "welcome") { if (ART) { memHash = "#/welcome"; return route(); } location.replace("#/welcome"); return; } return viewWelcome(); }
     switch (parts[0]) {
       case "": case "home": return viewHome();
@@ -324,6 +356,7 @@
     var inv = M.blankInvoice(S.company, tier);
     S.company.next = (M.num(S.company.next) || 1) + 1;
     if (projectId) { var p = projectById(projectId); if (p) { M.applyProject(inv, p, S.invoices); var cl = clientById(p.clientId); if (cl) setClient(inv, cl); } }
+    inv._new = M.draftSig(inv);
     S.invoices.push(inv); save(true); return inv;
   }
   function setClient(inv, cl) { inv.clientId = cl.id; inv.cust = { name: cl.name, attn: cl.attn || "", addr: cl.addr || "", email: cl.email || "", phone: cl.phone || "" }; if (cl.terms) { inv.terms = cl.terms; if (inv.dueAuto) inv.due = M.dueFor(inv.date, inv.terms); } }
@@ -697,7 +730,8 @@
     }
     if (adv && shown("fine", inv.fine)) html += '<div class="inv-fine">' + ed("fine", "Terms and conditions", "", true) + " " + removeLink("fine", "terms") + "</div>";
     else if (edit) html += '<div class="adds" style="margin-top:0.8rem">' + addLink("fine", "Terms and conditions") + "</div>";
-    html += '<footer class="inv-foot"><span>' + (c.name ? "Questions? " + esc([c.phone, c.email].filter(Boolean).join(" or ")) : "") + "</span><span>" + (inv.fingerprint ? "Invoice ID <b>" + esc(inv.fingerprint) + "</b> · " : "") + "Made with <b>" + M.NAME + "</b>, " + M.SITE + "</span></footer>";
+    var reach = [c.phone, c.email].filter(Boolean).join(" or ");
+    html += '<footer class="inv-foot"><span>' + (reach ? "Questions? " + esc(reach) : "") + "</span><span>" + (inv.fingerprint ? "Invoice ID <b>" + esc(inv.fingerprint) + "</b> · " : "") + "Made with <b>" + M.NAME + "</b>, " + M.SITE + "</span></footer>";
     return html;
   }
   function lines(s) { return String(s || "").split(/\r?\n/).map(function (x) { return x.trim(); }).filter(Boolean); }
@@ -743,7 +777,7 @@
     $main.innerHTML = '<div class="view wide stack">' +
       '<div class="card ledger"><div class="row between"><div><div class="row" style="gap:0.5rem">' + statusPill(inv) + '<span class="pill ' + (inv.tier === "advanced" ? "adv" : "simple") + '">' + inv.tier + '</span></div><div style="font-size:1.6rem;font-weight:600;margin-top:0.3rem" class="mono">' + money(st === "draft" || st === "paid" || st === "void" ? t.total : t.due, inv.currency) + '</div><div class="muted small">' + esc(inv.cust.name || "No customer yet") + " · " + esc(dueText(inv)) + (pr ? ' · <a href="#/project/' + pr.id + '">' + esc(pr.name) + "</a>" : "") + "</div></div></div>" +
       '<div class="row" style="margin-top:0.9rem">' + (st !== "void" ? sendButtons() + (st !== "paid" && st !== "draft" ? '<button type="button" class="btn green" data-payment>' + I.check + " Record a payment</button>" : "") : "") + '<button type="button" class="btn" data-more>More</button></div>' +
-      ((inv.sends || []).length ? '<p class="small muted" style="margin:0.6rem 0 0">' + I.mail + " " + esc(sendsText(inv)) + "</p>" : "") +
+      ((inv.sends || []).length ? '<p class="small muted note-line" style="margin:0.6rem 0 0">' + I.mail + "<span>" + esc(sendsText(inv)) + "</span></p>" : "") +
       (M.PRICING.mode === "free" ? '<p class="small muted" style="margin:0.7rem 0 0">Downloads are free during launch. Later, ' + (M.isSmall(inv) ? "this one stays free: it is under " + M.priceText(M.PRICING.freeUnder) + "." : M.priceText(M.price(inv)) + " once for this invoice (or a pack or a year pass); downloading it again is free.") + "</p>" : "") + "</div>" +
       ((inv.payments || []).length ? '<div class="card"><div class="section-head" style="margin-top:0"><h2>Payments</h2><span class="mono small">' + money(t.paid, inv.currency) + " of " + money(t.owed, inv.currency) + '</span></div><div class="list">' + inv.payments.map(function (p) { return '<div class="item" style="cursor:default"><div><div class="t">' + esc(p.method || "Payment") + (p.note ? ", " + esc(p.note) : "") + '</div><div class="s">' + esc(M.longDate(p.date)) + '</div></div><div class="r"><div class="amt">' + money(p.amount, inv.currency) + '</div><button type="button" class="btn-text quiet small" data-rmpay="' + p.id + '">Remove</button></div></div>'; }).join("") + "</div></div>" : "") +
       '<div class="inv readonly' + (inv.unlock ? "" : " locked") + '" data-inv style="--accent:' + esc(/^#[0-9a-f]{6}$/i.test(S.company.accent) ? S.company.accent : "#1C3F7A") + '">' + invoiceHtml(inv, S.company, { edit: false, slam: slam }) + "</div>" +
@@ -757,9 +791,11 @@
       var rp = e.target.closest("[data-rmpay]"); if (rp) { inv.payments = inv.payments.filter(function (p) { return p.id !== rp.getAttribute("data-rmpay"); }); if (inv.status === "paid") { inv.status = "sent"; inv.paidAt = ""; } touch(inv); save(); viewInvoice(inv.id); }
     });
   }
+  /* Is this invoice the one on screen (its page or its editor)? In the artifact preview the route is in memory. */
+  function onInvoice(inv) { var h = currentHash(); return h === "#/inv/" + inv.id || h.indexOf("#/edit/" + inv.id) === 0; }
   function sendsText(inv) {
     var last = inv.sends[inv.sends.length - 1];
-    return "Sent to " + last.to + " on " + M.longDate(last.at.slice(0, 10)) + (inv.sends.length > 1 ? " (" + inv.sends.length + " times)" : "") + ".";
+    return "Sent to " + last.to + " on " + M.longDate(M.iso(new Date(last.at))) + (inv.sends.length > 1 ? " (" + inv.sends.length + " times)" : "") + ".";
   }
   /* Send to customer: the phone's email app opens with the PDF attached and the address, subject and message filled in;
      the person presses Send there, from their own address. In a browser the PDF downloads first and the email opens
@@ -791,13 +827,13 @@
       if (!ok) return;
       busy("Making the PDF");
       return M.fingerprint(inv, S.company).then(function (fp) { inv.fingerprint = fp; return window.BHPDF.make(inv, S.company); }).then(function (out) {
-        var first = inv.status === "draft";
-        if (first) { inv.status = "sent"; inv.sentAt = M.today(); }
-        ensureClient(inv); touch(inv); busy(null);
+        busy(null);
         var done = function (howSent) {
           if (howSent === "cancelled") { save(true); return; }
+          if (inv.status === "draft") { inv.status = "sent"; inv.sentAt = M.today(); }
+          ensureClient(inv);
           inv.sends = inv.sends || []; inv.sends.push({ at: new Date().toISOString(), to: mail.to, how: howSent }); touch(inv); save(true);
-          if (location.hash === "#/inv/" + inv.id || location.hash === "#/edit/" + inv.id) route();
+          if (onInvoice(inv)) route();
           toast(howSent === "share" ? "Pick the app to send it with. The address is copied; paste it in the To line." : (NATIVE ? "Press Send in your email app." : "The PDF is in your downloads; attach it and press Send."), 5000);
         };
         if (NATIVE) return NATIVE.emailPdf(out.bytes, out.name, mail).then(function () { done("email"); }, function (e) { toast("Could not open an email app: " + (e && e.message ? e.message : e)); done("cancelled"); });
@@ -807,7 +843,8 @@
           if (navigator.clipboard && mail.to) navigator.clipboard.writeText(mail.to).catch(function () { });
           return navigator.share({ files: [file], title: mail.subject, text: mail.body }).then(function () { done("share"); }, function (e) { done(e && e.name === "AbortError" ? "cancelled" : "share"); });
         }
-        return Promise.resolve(download(blob, out.name)).then(function () {
+        return Promise.resolve(download(blob, out.name)).then(function (saved) {
+          if (saved === "cancelled") { done("cancelled"); return; }
           var href = "mailto:" + encodeURIComponent(mail.to) + "?subject=" + encodeURIComponent(mail.subject) + "&body=" + encodeURIComponent(mail.body);
           setTimeout(function () { window.location.href = href; }, 350);
           done("email");
@@ -877,12 +914,13 @@
       if (!ok) return;
       busy("Making the PDF");
       return M.fingerprint(inv, S.company).then(function (fp) { inv.fingerprint = fp; return window.BHPDF.make(inv, S.company); }).then(function (out) {
-        var first = inv.status === "draft";
-        if (first) { inv.status = "sent"; inv.sentAt = M.today(); }
-        ensureClient(inv); touch(inv); save(true); busy(null);
+        busy(null);
         return deliver(out, inv, share).then(function (how) {
-          if (how === "cancelled") return;
-          if (location.hash === "#/inv/" + inv.id || location.hash === "#/edit/" + inv.id) route();
+          if (how === "cancelled") { save(true); return; }
+          var first = inv.status === "draft";
+          if (first) { inv.status = "sent"; inv.sentAt = M.today(); }
+          ensureClient(inv); touch(inv); save(true);
+          if (onInvoice(inv)) route();
           var where = how === "downloaded" && savedWhere ? "Saved to " + savedWhere + "." : "PDF ready.";
           savedWhere = "";
           toast(first ? where + " Marked as sent; change that under More on the invoice." : where, how === "downloaded" && NATIVE ? 4200 : undefined);
@@ -1026,7 +1064,7 @@
       '<div class="card"><h3>Look</h3><div class="chips" style="margin-top:0.5rem">' + [["auto", "Match the phone"], ["light", "Light"], ["dark", "Dark"]].map(function (l) { return '<button type="button" class="chip' + ((S.settings.look || "auto") === l[0] ? " on" : "") + '" data-setlook="' + l[0] + '">' + l[1] + "</button>"; }).join("") + "</div></div>" +
       (iosSafariTab() ? '<div class="card" style="border-color:var(--amber)"><h3>Keep it safe</h3><p class="small" style="margin-top:0.4rem">In Safari, tap Share, then <b>Add to Home Screen</b>. As a home-screen app, Billhead opens full screen and works offline, and Safari stops counting the days toward clearing its stored data (it clears a site\'s data after seven days without a visit). Keep a backup file either way.</p></div>' : "") +
       '<div class="card"><h3>Backup</h3><p class="small muted" style="margin-top:0.4rem">' + (NATIVE ? "Everything lives on this phone. When Google backup is on, Android backs the app up to your Google account and carries it to a new phone. A backup file is a second copy you control: keep one somewhere safe." : "Everything lives on this device only. A backup file holds your company, customers, projects and invoices; keep one somewhere safe, and use it to move to a new phone.") + '</p><div class="row"><button type="button" class="btn" data-backup>Save a backup file</button><label class="btn file-btn">Restore from a backup<input type="file" accept=".json,application/json" data-restore></label>' + (S.invoices.length ? '<button type="button" class="btn" data-csv>Invoices as CSV</button>' : "") + "</div></div>" +
-      '<div class="card"><h3>Pricing</h3>' + (M.PRICING.mode === "free" ? '<p class="small" style="margin-top:0.4rem"><b>Free while the app is in testing.</b> The plan once it is not:</p>' : "") + pricingTable() +
+      '<div class="card"><h3>Pricing</h3>' + (M.PRICING.mode === "free" ? '<p class="small" style="margin-top:0.4rem"><b>Free during launch.</b> The prices after that:</p>' : "") + pricingTable() +
       '<p class="small muted">No subscription, no account, no ads. Billhead charges for the invoice, never a percentage of what your customer pays you: a $1,000 invoice costs ' + M.priceText(M.PRICING.simple) + " to make, and your customer pays you however you like. Apps that are free to send often take 2.9 percent plus 60 cents when the customer pays by card through them, which is $29.60 on $1,000.</p></div>" +
       '<div class="card"><h3>About</h3><p class="small" style="margin-top:0.4rem"><b>' + M.NAME + "</b> by Tompkins Software Systems. A billhead is what printers called a business's invoice form a century ago: the name at the top, the bill below. Nothing you type leaves this device; there is no server and no account. PDFs are drawn on the phone and locked against editing. Build " + esc(build) + '.</p><p class="small muted">Type: IBM Plex (SIL Open Font License). PDF: jsPDF (MIT). Signatures: signature_pad (MIT).</p>' +
       '<div class="row"><a class="btn small" href="https://' + M.SITE + '/support.html#billhead" target="_blank" rel="noopener">Support</a><a class="btn small" href="https://' + M.SITE + '/privacy.html#billhead" target="_blank" rel="noopener">Privacy</a>' + (S.invoices.length ? "" : '<button type="button" class="btn small" data-sample>Load a sample company</button>') + '<button type="button" class="btn-text danger" data-forget>Forget everything on this device</button></div></div></div>';

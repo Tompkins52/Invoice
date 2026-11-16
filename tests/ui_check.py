@@ -252,6 +252,10 @@ with sync_playwright() as pw:
     txt = page.inner_text('[data-inv]')
     check('2 of 3' in txt and '$3,200.00' in txt, 'the second invoice is 2 of 3 and shows the first as previously billed')
     check('Lakeside Dental' in txt, 'the customer carries over from the project')
+    page.locator('[data-inv] [data-f="lines.0.d"]').fill('Rough-in, second floor')
+    page.dispatch_event('[data-inv] [data-f="lines.0.d"]', 'input')
+    page.locator('[data-inv] [data-f="lines.0.r"]').fill('2900')
+    page.dispatch_event('[data-inv] [data-f="lines.0.r"]', 'input')
     shot(page, '09-second-progress-invoice')
 
     # ---------- Lists and backup ----------
@@ -377,6 +381,95 @@ with sync_playwright() as pw:
     spage.reload(wait_until='networkidle')
     check(spage.locator('#uf-intro').count() == 0, 'it does not play again in the same session')
     sctx.close()
+
+    # ---------- Smaller things that went wrong once (November 15) ----------
+    seed_js = open(os.path.join(ROOT, 'tools', 'sample_company.js'), encoding='utf-8').read()
+
+    def seeded(**kw):
+        c = browser.new_context(viewport={'width': 360, 'height': 740}, device_scale_factor=1, accept_downloads=True, **kw)
+        pg = c.new_page()
+        pg.on('pageerror', lambda e: errors.append(str(e)))
+        pg.goto(BASE + 'icons/icon-192.png', wait_until='domcontentloaded')
+        pg.evaluate(seed_js + '; seed({logo: SAMPLE_LOGO, ask: false})')
+        return c, pg
+
+    # A new invoice nobody typed into is not kept, and its number is given back.
+    fctx, fp = seeded()
+    fp.goto(BASE + '#/new/simple', wait_until='networkidle')
+    fp.click('[data-tool="edit"]')
+    fp.wait_for_selector('[data-inv]')
+    check('INV-1046' in fp.inner_text('#hdr'), 'a new invoice takes the next number')
+    fp.goto(BASE + '#/invoices', wait_until='networkidle')
+    check('INV-1046' not in fp.inner_text('main') and fp.locator('.list .item').count() == 6, 'left untouched, it is not kept as an empty draft')
+    check(fp.evaluate('JSON.parse(localStorage.getItem("billhead.v1")).company.next') == 1046, 'and its number is given back')
+    fp.goto(BASE + '#/new/simple', wait_until='networkidle')
+    fp.click('[data-tool="edit"]')
+    fp.wait_for_selector('[data-inv]')
+    fp.locator('[data-inv] [data-f="cust.name"]').fill('Oak Street Bakery')
+    fp.dispatch_event('[data-inv] [data-f="cust.name"]', 'input')
+    fp.wait_for_timeout(500)
+    fp.goto(BASE + '#/invoices', wait_until='networkidle')
+    check('INV-1046' in fp.inner_text('main'), 'once something is typed, it stays as a draft')
+
+    # A new screen opens at its top; the back button returns to where the person was.
+    fp.goto(BASE + '#/more', wait_until='networkidle')
+    fp.evaluate('window.scrollTo(0, 600)')
+    fp.wait_for_timeout(100)
+    was = fp.evaluate('window.scrollY')
+    fp.click('a[href="#/invoices"]')
+    fp.wait_for_selector('[data-q]')
+    check(was > 300 and fp.evaluate('window.scrollY') == 0, 'a new screen opens at its top')
+    fp.go_back()
+    fp.wait_for_selector('[data-backup]')
+    fp.wait_for_timeout(200)
+    check(abs(fp.evaluate('window.scrollY') - was) < 40, 'going back returns to where the person was (%d, was %d)' % (fp.evaluate('window.scrollY'), was))
+
+    # The invoice page: Send leads, the PDF button is plain, and the sent line has a small icon and the local day.
+    fp.goto(BASE + '#/inv/i1043', wait_until='networkidle')
+    check('primary' in fp.get_attribute('[data-send]', 'class') and 'primary' not in fp.get_attribute('[data-pdf]', 'class'), 'Send to customer is the main button; the PDF button is plain')
+    fctx.close()
+
+    # 8:30 in the evening in Chicago is already tomorrow in Greenwich: the app must say today.
+    tctx, tp = seeded(timezone_id='America/Chicago')
+    tp.clock.install(time='2026-11-16T02:30:00Z')
+    tp.goto(BASE + '#/inv/i1043', wait_until='networkidle')
+    tp.click('[data-send]')
+    tp.wait_for_selector('.sheet [data-ok]')
+    with tp.expect_download():
+        tp.click('.sheet [data-ok]')
+    tp.wait_for_selector('.note-line')
+    line = tp.inner_text('.note-line')
+    check('November 15, 2026' in line, 'the sent line shows the day on this phone, not the day in Greenwich (%s)' % line.strip())
+    box = tp.locator('.note-line svg').bounding_box()
+    check(box and box['width'] <= 20 and box['height'] <= 20, 'the envelope beside it is a small icon (%s)' % (box and '%d x %d' % (box['width'], box['height'])))
+    tctx.close()
+
+    # A share the person cancels does not mark the invoice sent.
+    sctx2, sp = seeded()
+    sp.add_init_script('navigator.canShare = function () { return true; }; navigator.share = function () { var e = new Error("cancelled"); e.name = "AbortError"; return Promise.reject(e); };')
+    sp.goto(BASE + '#/inv/i1044', wait_until='networkidle')
+    sp.wait_for_selector('[data-share]')
+    sp.click('[data-share]')
+    sp.wait_for_timeout(1500)
+    check(sp.evaluate('JSON.parse(localStorage.getItem("billhead.v1")).invoices.filter(function (i) { return i.id === "i1044"; })[0].status') == 'draft', 'a share that was cancelled leaves the invoice a draft')
+    sctx2.close()
+
+    # With no phone or email on file, the invoice does not end on a bare "Questions?".
+    qctx, qp = seeded()
+    qp.evaluate('var s = JSON.parse(localStorage.getItem("billhead.v1")); s.company.phone = ""; s.company.email = ""; localStorage.setItem("billhead.v1", JSON.stringify(s));')
+    qp.goto(BASE + '#/inv/i1043', wait_until='networkidle')
+    check('Questions?' not in qp.inner_text('[data-inv]'), 'no bare "Questions?" on the invoice when there is no phone or email')
+    with qp.expect_download() as dl:
+        qp.click('[data-pdf]')
+    rq = PdfReader(dl.value.path())
+    rq.decrypt('')
+    check('Questions?' not in rq.pages[0].extract_text(), 'nor on the PDF')
+    # Nothing on the editor is wider than a small phone.
+    qp.goto(BASE + '#/edit/i1040', wait_until='networkidle')
+    qp.wait_for_selector('[data-inv]')
+    wide = qp.evaluate('''() => { var inv = document.querySelector("[data-inv]"), r = inv.getBoundingClientRect(); return Array.prototype.slice.call(inv.querySelectorAll("*")).filter(function (e) { var b = e.getBoundingClientRect(); return b.width > 0 && b.right > r.right + 1; }).map(function (e) { return (e.className || e.tagName) + ""; }).slice(0, 5); }''')
+    check(wide == [], 'nothing on the invoice runs off the right edge of a 360 px phone' + ('' if wide == [] else ' (%s)' % ', '.join(wide)))
+    qctx.close()
 
     check(not errors, 'no page errors' + ('' if not errors else ': ' + '; '.join(errors[:3])))
     browser.close()
