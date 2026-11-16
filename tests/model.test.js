@@ -184,4 +184,30 @@ t("the email to the customer carries the number, the amount due, the due date, t
   assert.ok(Array.isArray(M.blankInvoice(c, "simple").sends), "a new invoice has an empty send log");
 });
 
+t("a new invoice nobody typed into is told apart from one somebody did", () => {
+  const c = M.sampleCompany(); const inv = M.blankInvoice(c, "simple");
+  inv._new = M.draftSig(inv);
+  assert.ok(M.isUntouched(inv), "just made");
+  inv.cust.name = "Oak Street Bakery"; assert.ok(!M.isUntouched(inv), "a name was typed");
+  inv.cust.name = ""; assert.ok(M.isUntouched(inv), "typed and erased again is untouched again");
+  inv.lines[0].r = 50; assert.ok(!M.isUntouched(inv), "a rate was typed");
+  inv.lines[0].r = ""; inv.status = "sent"; assert.ok(!M.isUntouched(inv), "an invoice that went out is never dropped");
+  assert.ok(!M.isUntouched(M.blankInvoice(c, "simple")), "an invoice from before this mark existed is kept");
+});
+
+t("prices read the way a sign would", () => {
+  assert.strictEqual(M.priceText(0.99), "99\u00a2"); assert.strictEqual(M.priceText(1.99), "$1.99");
+  assert.strictEqual(M.priceText(100), "$100", "a whole dollar amount drops the cents"); assert.strictEqual(M.priceText(99.5), "$99.50");
+});
+
+t("a company from before the questions were asked one at a time is not asked them again", () => {
+  const before = M.normalize({ company: M.sampleCompany(), settings: { onboarded: true } });
+  assert.deepStrictEqual(before.settings.asked, { details: true, pay: true, tax: true, terms: true });
+  assert.strictEqual(before.settings.tool, "", "no way of making invoices is picked until the person picks one");
+  assert.deepStrictEqual(M.normalize({}).settings.asked, {}, "a new device has everything still to ask");
+  const mid = M.normalize({ company: M.sampleCompany(), settings: { asked: { tax: true }, tool: "ask" } });
+  assert.deepStrictEqual(mid.settings.asked, { tax: true }, "answers already given are kept as they are");
+  assert.strictEqual(mid.settings.tool, "ask");
+});
+
 setTimeout(() => console.log("\n" + n + " checks passed"), 50);

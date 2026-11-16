@@ -183,6 +183,13 @@ p > svg, .small > svg { width: 1.1em; height: 1.1em; vertical-align: -0.16em; }
 .bar { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
 .bar i { display: block; height: 100%; background: var(--navy); border-radius: 4px; transition: width 0.6s var(--ease); }
 
+/* The first screen */
+.welcome { display: grid; gap: 0.9rem; max-width: 520px; padding-top: 1.4rem; }
+.welcome-top { display: grid; justify-items: center; gap: 0.35rem; text-align: center; margin-bottom: 0.3rem; }
+.welcome-top .mark.big { width: 72px; height: 72px; border-radius: 17px; box-shadow: var(--shadow); margin-bottom: 0.3rem; }
+.welcome-top h1 { font-size: 1.7rem; }
+.welcome-top p { margin: 0; }
+.center { text-align: center; }
 /* Tier and tool choice */
 .choice { display: grid; gap: 0.75rem; }
 .choice .opt { display: grid; gap: 0.3rem; text-align: left; padding: 1rem 1.1rem; border: 2px solid var(--line); border-radius: var(--radius); background: var(--surface); cursor: pointer; transition: border-color 0.15s, transform 0.15s var(--ease), box-shadow 0.15s; }
@@ -201,6 +208,28 @@ p > svg, .small > svg { width: 1.1em; height: 1.1em; vertical-align: -0.16em; }
 .wiz .prog i.done { background: var(--navy); }
 .wiz .prog i.now { background: var(--navy); opacity: 0.55; }
 .wiz .q { font-size: 1.45rem; font-weight: 600; letter-spacing: -0.015em; margin: 0.2rem 0 0.4rem; line-height: 1.2; }
+.wiz .line .foot .btn.small { min-height: 40px; color: var(--muted); }
+/* The sum under the lines. The tax rate, a discount and a deposit are typed where they act. */
+.totals { display: grid; gap: 0.1rem; padding: 0.6rem 0.9rem 0.7rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.totals .trow { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; min-height: 44px; }
+.totals .trow > span { display: flex; align-items: center; flex-wrap: wrap; gap: 0.2rem 0.45rem; color: var(--ink-2); min-width: 0; }
+.totals .trow > b { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 500; white-space: nowrap; }
+.totals .trow.strong { border-top: 1px solid var(--line-2); margin-top: 0.25rem; color: var(--ink); }
+.totals .trow.strong > span { color: var(--ink); font-weight: 600; }
+.totals .trow.strong > b { font-weight: 600; font-size: 1.08rem; }
+.totals .trow.due { margin: 0.3rem -0.45rem 0; padding: 0 0.45rem; border-radius: 8px; background: var(--navy); }
+.totals .trow.due > span, .totals .trow.due > b { color: var(--navy-ink); font-weight: 600; }
+.totals input { width: 5rem; min-height: 40px; padding: 0.3rem 0.5rem; border: 1px solid var(--line-2); border-radius: 8px; background: var(--surface); color: var(--ink); font-family: var(--mono); text-align: right; outline: none; -webkit-appearance: none; appearance: none; }
+.totals input:focus { border-color: var(--navy); box-shadow: 0 0 0 3px color-mix(in srgb, var(--navy) 22%, transparent); }
+.totals .money-in input { width: 6.2rem; padding-left: 1.4rem; }
+.totals .money-in::before { left: 0.5rem; }
+.totals .pct-in { display: inline-flex; align-items: center; gap: 0.25rem; }
+.totals .pct-in::after { content: "%"; color: var(--muted); }
+.totals .tpart { display: grid; }
+.totals .tpart .trow { min-height: 36px; }
+.totals .tctl { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; padding: 0 0 0.45rem; }
+.totals .tctl .btn-text { margin-left: auto; min-height: 40px; }
+.chip.mini { min-height: 40px; min-width: 40px; justify-content: center; padding: 0.2rem 0.65rem; font-family: var(--mono); font-size: 0.82rem; font-weight: 500; }
 .wiz .why { color: var(--muted); margin-bottom: 1rem; }
 .wiz .step { animation: rise 0.3s var(--ease); display: grid; gap: 0.8rem; }
 .wiz-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; display: flex; gap: 0.6rem; padding: 0.7rem 1rem calc(0.7rem + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--line); }
@@ -211,6 +240,9 @@ p > svg, .small > svg { width: 1.1em; height: 1.1em; vertical-align: -0.16em; }
 .wiz .line .nums.adv { grid-template-columns: 1fr 1fr 1.2fr; }
 .wiz .line .foot { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
 .wiz .line .lamt { font-family: var(--mono); font-weight: 600; }
+/* What a line comes to is worked out, not typed: it sits where a box would, without looking like one. */
+.wiz .line .lamt.out { display: flex; align-items: center; justify-content: flex-end; min-height: 46px; padding-right: 0.15rem; }
+.wiz .line .lbl.r { text-align: right; }
 .wiz .picked { display: grid; gap: 0.2rem; padding: 0.8rem 0.9rem; border-radius: var(--radius); background: var(--navy-soft); color: var(--ink); }
 .sig-wrap { border: 1px dashed var(--line-2); border-radius: var(--radius); background: #fff; position: relative; overflow: hidden; }
 .sig-wrap canvas { display: block; width: 100%; height: 180px; touch-action: none; }
@@ -223,6 +255,13 @@ p > svg, .small > svg { width: 1.1em; height: 1.1em; vertical-align: -0.16em; }
 .inv-tools { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.7rem; }
 .inv-tools .spacer { flex: 1; }
 .inv-note { font-size: 0.85rem; color: var(--muted); margin: 0 0 0.7rem; }
+.view.with-bar { padding-bottom: 6.5rem; }
+.wiz-nav.act .btn.primary { flex: 1; min-width: 0; }
+.wiz-nav.act .btn.mini { flex: none; flex-direction: column; gap: 1px; min-width: 58px; padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; }
+.wiz-nav.act .btn.mini svg { width: 20px; height: 20px; }
+body.kb .wiz-nav.act { display: none; }
+.send-row > .primary, .send-row > .green { flex: 1 1 100%; }
+@media (min-width: 640px) { .send-row > .primary, .send-row > .green { flex: 0 1 auto; } }
 .inv-bar { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.55rem 0.8rem; border-radius: var(--radius); background: var(--navy-soft); color: var(--ink); font-size: 0.88rem; margin-bottom: 0.7rem; }
 .inv-bar b { font-weight: 600; }
 .inv-bar.warn { background: var(--amber-soft); }
@@ -346,9 +385,11 @@ p > svg, .small > svg { width: 1.1em; height: 1.1em; vertical-align: -0.16em; }
 .sheet h2 { margin-bottom: 0.3rem; }
 .sheet .actions { display: grid; gap: 0.5rem; margin-top: 1rem; }
 @media (min-width: 640px) { .sheet-wrap { align-items: center; padding: 1rem; } .sheet { border-radius: 18px; } }
-.toast { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 50; background: var(--ink); color: var(--bg); padding: 0.6rem 1rem; border-radius: 999px; font-size: 0.9rem; font-weight: 500; box-shadow: var(--shadow-lg); animation: up 0.3s var(--ease); max-width: calc(100% - 2rem); text-align: center; }
+.toast { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 50; background: var(--ink); color: var(--bg); padding: 0.6rem 1rem; border-radius: 999px; font-size: 0.9rem; font-weight: 500; box-shadow: var(--shadow-lg); animation: toast-in 0.3s var(--ease); max-width: calc(100% - 2rem); text-align: center; }
+/* The toast is centred with a transform, so its entrance keeps that transform (the sheet's "up" would drop it and the toast would jump sideways). */
+@keyframes toast-in { from { transform: translate(-50%, 24px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
 .toast.out { animation: fade 0.25s reverse forwards; }
-body.has-tabs .toast { bottom: calc(var(--tab-h) + 16px + env(safe-area-inset-bottom)); }
+body.has-tabs .toast, body.has-bar .toast { bottom: calc(var(--tab-h) + 22px + env(safe-area-inset-bottom)); }
 
 /* Desktop: the tab bar becomes a left rail */
 @media (min-width: 900px) {
@@ -362,7 +403,10 @@ body.has-tabs .toast { bottom: calc(var(--tab-h) + 16px + env(safe-area-inset-bo
   .tabs .rail-brand img { width: 30px; height: 30px; border-radius: 8px; }
   .hdr { padding-left: 1rem; }
   .hdr .brand { display: none; }
-  .wiz-nav { left: 200px; }
+  /* The bottom bar on a wide screen: its buttons keep to the width of what is above them. (The rail is hidden on these screens.) */
+  .wiz-nav { padding-left: max(1rem, calc((100% - 640px) / 2 + 1rem)); padding-right: max(1rem, calc((100% - 640px) / 2 + 1rem)); }
+  .wiz-nav.act { padding-left: max(1rem, calc((100% - 980px) / 2 + 1rem)); padding-right: max(1rem, calc((100% - 980px) / 2 + 1rem)); justify-content: flex-end; }
+  .wiz-nav.act .btn.primary { flex: 0 1 320px; }
   .toast { bottom: 24px; }
 }
 @media (max-width: 899px) { .tabs .rail-brand { display: none; } }

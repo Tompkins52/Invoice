@@ -43,7 +43,7 @@ adb shell settings put global transition_animation_scale 0 || true
 adb shell settings put global animator_duration_scale 0 || true
 adb logcat -c || true
 
-# 1. Fresh install: the app starts on the company profile.
+# 1. Fresh install: the app starts on the first screen, which asks what the business is called.
 adb install -r "$APK"
 launch 12
 screen 01-fresh
@@ -52,8 +52,8 @@ ok "fresh start, no crash"
 UI="$(ui_text)"
 echo "$UI" > "$OUT/01-text.txt"
 echo "$UI" | grep -q "Billhead" || fail "the first screen does not show Billhead (WebView did not render?)"
-echo "$UI" | grep -qi "company" || fail "a fresh install should open on the company profile"
-ok "the first screen renders, on the company profile"
+echo "$UI" | grep -qi "business called" || fail "a fresh install should open on the first screen (What is your business called?)"
+ok "the first screen renders, asking what the business is called"
 
 # 2. The state file alone brings the data back (a restored phone has the file, not the WebView storage).
 adb shell am force-stop "$PKG"

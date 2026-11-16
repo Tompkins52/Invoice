@@ -36,7 +36,7 @@ var seed = (arg) => {
       pay: { to: 'Hart Electric LLC', instr: 'Mail checks to the address above, or ask for our ACH letter.', link: '', late: '1.5% per month after the due date', notes: 'Thank you for the work.' } })
   ];
   if (arg.ask) invoices.push(inv({ id: 'i1046', tier: 'simple', status: 'draft', clientId: 'c3', projectId: '', num: 'INV-1046', date: d(0), due: d(30), sentAt: '', createdAt: d(0), updatedAt: d(0), cust: cust(bakery),
-    lines: [L('Replace exterior sign lighting', 1, 420), L('LED sign modules', 2, 65)], _step: 2 }));
+    lines: [L('Replace exterior sign lighting', 1, 420), L('LED sign modules', 2, 65)], _step: 'work' }));
   const state = { v: 1, credits: { simple: 0, advanced: 0 }, pass: { until: '' }, settings: { look: 'light', sounds: false, onboarded: true }, savedAt: new Date().toISOString(),
     company: { name: 'Hart Electric LLC', logo: arg.logo, addr: '300 Main St, Suite 2' + nl + 'Prairie City, IL 60000', phone: '(555) 010-0142', email: 'office@hartelectric.example', web: 'hartelectric.example',
       taxid: '', vatLabel: '', vat: '', accent: '#1C3F7A', currency: 'USD', paper: 'letter', terms: 'Net 30', taxRate: 7.25, taxLabel: 'Sales tax', payTo: 'Hart Electric LLC',

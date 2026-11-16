@@ -150,7 +150,7 @@
     if (contact) lines.push(contact);
     return { to: inv.cust.email || "", subject: "Invoice " + inv.num + (c.name ? " from " + c.name : "") + (po ? " (" + poText + ")" : ""), body: lines.join(nl) };
   };
-  M.priceText = function (n) { return n < 1 ? Math.round(n * 100) + "¢" : "$" + n.toFixed(2); };
+  M.priceText = function (n) { return n < 1 ? Math.round(n * 100) + "¢" : "$" + (n % 1 === 0 ? String(n) : n.toFixed(2)); };
 
   /* Status as the app shows it. Draft until the PDF is made; then sent, partial, paid, or overdue by the due date. */
   M.status = function (inv, todayIso) {
@@ -226,7 +226,9 @@
 
   /* ---------- Storage (one JSON document in localStorage; a backup file is the same document) ---------- */
   M.KEY = "billhead.v1";
-  M.blankState = function () { return { v: M.DATA_VERSION, company: null, clients: [], projects: [], invoices: [], credits: { simple: 0, advanced: 0 }, pass: { until: "" }, settings: { look: "auto", sounds: false, onboarded: false }, savedAt: "" }; };
+  /* settings.tool: how a new invoice opens ("ask", "edit", or "" to choose each time). settings.asked: which of the
+     profile's questions have been put to the person already (details, pay, tax, terms), so each is asked once. */
+  M.blankState = function () { return { v: M.DATA_VERSION, company: null, clients: [], projects: [], invoices: [], credits: { simple: 0, advanced: 0 }, pass: { until: "" }, settings: { look: "auto", sounds: false, onboarded: false, tool: "", setupLater: false }, savedAt: "" }; };
   /* An invoice under the free limit (the total billed, before deposits and payments) never costs anything. */
   M.isSmall = function (inv) { return !!M.PRICING.freeUnder && M.totals(inv).total < M.PRICING.freeUnder; };
   /* What a new invoice said when it was made: the app keeps this on the invoice (_new) and drops the invoice if
@@ -249,6 +251,8 @@
   };
   M.normalize = function (data) {
     var s = M.merge(M.blankState(), data || {});
+    /* A company set up before the questions were asked one at a time filled in the whole profile form: nothing is left to ask. */
+    if (!s.settings.asked) s.settings.asked = s.company ? { details: true, pay: true, tax: true, terms: true } : {};
     if (s.company) s.company = M.merge(M.blankCompany(), s.company);
     s.clients = (s.clients || []).map(function (c) { return M.merge(M.blankClient(), c); });
     s.projects = (s.projects || []).map(function (p) { return M.merge(M.blankProject(), p); });

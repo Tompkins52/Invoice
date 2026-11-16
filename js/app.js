@@ -19,13 +19,15 @@
   var NATIVE = window.BHNative || null;
   var canShareFiles = (function () { if (NATIVE) return true; try { return !ART && !!(navigator.share && navigator.canShare && navigator.canShare({ files: [new File(["x"], "x.pdf", { type: "application/pdf" })] })); } catch (e) { return false; } })();
   /* On a phone the share sheet is the way out (Save to Files, Mail, Messages, AirDrop); on a computer, a download. */
-  function pdfButtons(primary) {
-    var cls = primary ? "btn primary" : "btn";
-    if (canShareFiles) return '<button type="button" class="' + cls + '" data-share>' + I.share + ' Share PDF</button><button type="button" class="btn" data-pdf>' + I.down + (NATIVE ? " Save to phone" : " Download") + "</button>";
-    return '<button type="button" class="' + cls + '" data-pdf>' + I.down + " Download PDF</button>";
+  function pdfButtons(primary, compact) {
+    var cls = primary ? "btn primary" : "btn", mini = compact ? " mini" : "", save = NATIVE ? "Save to phone" : "Download";
+    if (canShareFiles) return '<button type="button" class="' + cls + mini + '" data-share' + (compact ? ' aria-label="Share PDF"' : "") + ">" + I.share + (compact ? "<span>Share</span>" : " Share PDF") + '</button><button type="button" class="btn' + mini + '" data-pdf' + (compact ? ' aria-label="' + save + '"' : "") + ">" + I.down + (compact ? "<span>Save</span>" : " " + save) + "</button>";
+    return '<button type="button" class="' + cls + mini + '" data-pdf' + (compact ? ' aria-label="Download PDF"' : "") + ">" + I.down + (compact ? "<span>PDF</span>" : " Download PDF") + "</button>";
   }
-  /* Send to customer leads (the email app with the PDF attached); the PDF on its own follows as plain buttons. */
-  function sendButtons() { return '<button type="button" class="btn primary" data-send>' + I.mail + " Send to customer</button>" + pdfButtons(false); }
+  /* Send to customer leads (the email app with the PDF attached); the PDF on its own follows as plain buttons.
+     compact: the editor's bottom bar, where the PDF buttons are an icon over a short word.
+     again: the invoice already went out, so sending is no longer the main thing to do with it. */
+  function sendButtons(compact, again) { return '<button type="button" class="btn' + (again ? "" : " primary") + '" data-send>' + I.mail + (again ? " Send again" : " Send to customer") + "</button>" + pdfButtons(false, compact); }
   var saveTimer = null;
   function save(now) {
     clearTimeout(saveTimer);
@@ -41,6 +43,8 @@
      Without it the move is the back or forward button, and the screen returns to where the person left it. */
   var navNew = false, lastHash = null, scrollMem = {};
   function go(hash) { navNew = true; if (ART) { memHash = hash; route(); return; } if (location.hash === hash) route(); else location.hash = hash; }
+  /* The same, but the screen we are on does not stay in the phone's history: the back button skips it. */
+  function replaceTo(hash) { navNew = true; if (ART) { memHash = hash; route(); return; } if (location.hash === hash) route(); else location.replace(hash); }
   function invoiceById(id) { return S.invoices.filter(function (i) { return i.id === id; })[0]; }
   function projectById(id) { return S.projects.filter(function (p) { return p.id === id; })[0]; }
   function clientById(id) { return S.clients.filter(function (c) { return c.id === id; })[0]; }
@@ -62,15 +66,18 @@
     check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>',
     mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
     pen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10-10-4-4L4 16z"/><path d="M12 8l4 4"/></svg>',
-    sheet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5 3h14v18H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>'
+    sheet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5 3h14v18H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
+    close: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>'
   };
   /* The app's mark, the same drawing as the icons (tools/make_icons.py; tests/ui_check.py checks they match). */
   var MARK = '<svg class="mark" viewBox="0 0 1024 1024" aria-hidden="true"><rect width="1024" height="1024" rx="230" fill="#172E4E"/><path d="M260,160 H584 L716,292 V840 a24,24 0 0 1 -24,24 H260 a24,24 0 0 1 -24,-24 V184 a24,24 0 0 1 24,-24 Z" fill="#FFFFFF"/><path d="M584,170 V270 q0,22 22,22 H706" fill="none" stroke="#172E4E" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/><rect x="298" y="245" width="190" height="34" rx="17" fill="#172E4E"/><rect x="298" y="311" width="120" height="34" rx="17" fill="#172E4E"/><rect x="298" y="423" width="300" height="34" rx="17" fill="#172E4E"/><rect x="298" y="491" width="196" height="34" rx="17" fill="#172E4E"/><rect x="298" y="559" width="222" height="34" rx="17" fill="#172E4E"/><rect x="298" y="711" width="190" height="62" rx="31" fill="#172E4E"/><g transform="translate(662 760) rotate(-18) scale(0.9)"><path d="M-22,-214 L-22,-124 Q-22,-84 -62,-84 L62,-84 Q22,-84 22,-124 L22,-214 Z" fill="#172E4E" stroke="#172E4E" stroke-width="32" stroke-linejoin="round"/><path d="M0,-290 a50,50 0 1 0 0.1,0 Z" fill="#172E4E" stroke="#172E4E" stroke-width="32" stroke-linejoin="round"/><path d="M-132,-66 Q-132,-88 -110,-88 L110,-88 Q132,-88 132,-66 L132,-18 Q132,-10 124,-10 L-124,-10 Q-132,-10 -132,-18 Z" fill="#172E4E" stroke="#172E4E" stroke-width="32" stroke-linejoin="round"/><path d="M-132,21 Q-132,12 -123,12 L123,12 Q132,12 132,21 L132,37 Q132,46 123,46 L-123,46 Q-132,46 -132,37 Z" fill="#172E4E" stroke="#172E4E" stroke-width="32" stroke-linejoin="round"/><path d="M-22,-214 L-22,-124 Q-22,-84 -62,-84 L62,-84 Q22,-84 22,-124 L22,-214 Z" fill="#F34D38"/><path d="M0,-290 a50,50 0 1 0 0.1,0 Z" fill="#F34D38"/><path d="M-132,-66 Q-132,-88 -110,-88 L110,-88 Q132,-88 132,-66 L132,-18 Q132,-10 124,-10 L-124,-10 Q-132,-10 -132,-18 Z" fill="#F34D38"/><path d="M-132,21 Q-132,12 -123,12 L123,12 Q132,12 132,21 L132,37 Q132,46 123,46 L-123,46 Q-132,46 -132,37 Z" fill="#F34D38"/></g></svg>';
 
   /* ---------- Frame: header, tabs, toasts, sheets ---------- */
+  var hdrClose = null;
+  $hdr.addEventListener("click", function (e) { if (hdrClose && e.target.closest("[data-close]")) hdrClose(); });
   function header(title, opts) {
     opts = opts || {};
-    $hdr.innerHTML = (opts.back ? '<button class="back" type="button" data-go="' + esc(opts.back) + '" aria-label="Back">' + I.back + (opts.backLabel ? "<span>" + esc(opts.backLabel) + "</span>" : "") + "</button>" : '<a class="brand" href="#/">' + MARK + "</a>") +
+    $hdr.innerHTML = (opts.close ? '<button class="back" type="button" data-close aria-label="Close">' + I.close + "</button>" : opts.back ? '<button class="back" type="button" data-go="' + esc(opts.back) + '" aria-label="Back">' + I.back + (opts.backLabel ? "<span>" + esc(opts.backLabel) + "</span>" : "") + "</button>" : '<a class="brand" href="#/">' + MARK + "</a>") +
       '<div class="title">' + esc(title) + "</div>" + (opts.actions ? '<div class="actions">' + opts.actions + "</div>" : "");
   }
   function tabs(active) {
@@ -182,7 +189,8 @@
   }
   function routeTo() {
     if (!ART && takeImport()) return;
-    closeSheet(); mainHandlers = {};
+    closeSheet(); mainHandlers = {}; hdrClose = null; document.body.classList.remove("has-bar");
+    clearTimeout(wizTimer); if (wizFlush) { var flush = wizFlush; wizFlush = null; try { flush(); } catch (err) { } }
     var h = currentHash().replace(/^#\/?/, ""), parts = h.split("/");
     dropUntouched(parts[0] === "ask" || parts[0] === "edit" || parts[0] === "inv" ? parts[1] : "");
     if (!S.company) { if (parts[0] !== "welcome") { if (ART) { memHash = "#/welcome"; return route(); } location.replace("#/welcome"); return; } return viewWelcome(); }
@@ -190,7 +198,7 @@
       case "": case "home": return viewHome();
       case "welcome": return viewWelcome();
       case "new": return viewNew(parts[1] || "", parts[2] || "");
-      case "ask": return viewWizard(parts[1]);
+      case "ask": return viewWizard(parts[1], parts[2] || "");
       case "edit": return viewEditor(parts[1]);
       case "inv": return viewInvoice(parts[1]);
       case "invoices": return viewInvoices(parts[1] || "all");
@@ -199,14 +207,14 @@
       case "clients": return viewClients();
       case "client": return viewClientEdit(parts[1] === "new" ? null : parts[1]);
       case "more": return viewMore();
-      case "company": return viewCompany();
+      case "company": return viewCompany(parts[1] || "");
       default: return viewHome();
     }
   }
   window.addEventListener("hashchange", route);
 
   /* ---------- Welcome: the company profile ---------- */
-  function companyForm(c, isNew) {
+  function companyForm(c) {
     return '<div class="stack" data-company>' +
       '<div class="card"><div class="stack">' +
       field("Company name", input("name", c.name, 'type="text" placeholder="Hart Electric LLC" autocomplete="organization"'), "As it should print on invoices.") +
@@ -234,26 +242,24 @@
       field("Late fee or early-pay terms", input("late", c.late, 'type="text" placeholder="1.5% per month after the due date"'), "Advanced invoices print this under Payment. Late fees hold up only when they were agreed to in advance.") +
       field("Terms and conditions", textarea("fine", c.fine, "Fine print for advanced invoices", 3)) +
       "</div></details>" +
-      '<button type="button" class="btn primary big block" data-company-save>' + (isNew ? "Save and start invoicing" : "Save changes") + "</button>" +
-      (isNew ? '<p class="small muted" style="text-align:center">Everything stays on this device. No account, no server. <button type="button" class="btn-text" data-sample>Just looking? Load a sample company.</button></p>' : "") +
+      '<button type="button" class="btn primary big block" data-company-save>Save changes</button>' +
       "</div>";
   }
   function bindCompanyForm(scope, c, after) {
     onMain("change", function (e) {
       if (e.target.matches("[data-logo]")) {
         var f = e.target.files && e.target.files[0]; if (!f) return;
-        readLogo(f, function (dataUrl) { c.logo = dataUrl; readFields(scope, c); var host = scope.querySelector("[data-company]") || scope; host.outerHTML = companyForm(c, !S.company); bindCompanyForm($main, c, after); });
+        readLogo(f, function (dataUrl) { c.logo = dataUrl; readFields(scope, c); var host = scope.querySelector("[data-company]") || scope; host.outerHTML = companyForm(c); bindCompanyForm($main, c, after); });
       }
     });
     onMain("click", function (e) {
-      if (e.target.closest("[data-logo-clear]")) { readFields(scope, c); c.logo = ""; var host = scope.querySelector("[data-company]") || scope; host.outerHTML = companyForm(c, !S.company); bindCompanyForm($main, c, after); return; }
+      if (e.target.closest("[data-logo-clear]")) { readFields(scope, c); c.logo = ""; var host = scope.querySelector("[data-company]") || scope; host.outerHTML = companyForm(c); bindCompanyForm($main, c, after); return; }
       if (e.target.closest("[data-company-save]")) {
         readFields(scope, c);
         if (!c.name.trim()) { toast("The company name is the one thing an invoice cannot do without."); scope.querySelector('[data-k="name"]').focus(); return; }
         c.next = Math.max(1, Math.round(M.num(c.next)) || 1); if (!c.payTo) c.payTo = c.name;
         after(c);
       }
-      if (e.target.closest("[data-sample]")) { loadSample(); }
     });
   }
   function readLogo(file, done) {
@@ -266,16 +272,41 @@
     };
     r.readAsDataURL(file);
   }
+  /* The first screen asks for one thing, the name that prints on the invoice (and a logo for whoever has one).
+     The rest of the profile is asked for where it matters, once: in the first invoice's questions, or from Home. */
   function viewWelcome() {
     tabs(null); header(M.NAME);
     var c = S.company ? M.clone(S.company) : (importDraft ? M.clone(importDraft.company) : M.blankCompany());
-    $main.innerHTML = '<div class="view"><div class="card navy" style="margin-bottom:1rem"><div class="row" style="gap:0.8rem;align-items:center">' + MARK.replace('class="mark"', 'class="mark" style="width:44px;height:44px;border-radius:10px"') + '<div><h1 style="color:inherit">' + M.NAME + '</h1><div class="muted">' + esc(M.TAGLINE) + '</div></div></div><p style="margin:0.9rem 0 0">Set up your company once. After that, every new invoice starts filled in: your name and logo, your terms, your tax rate, how to pay you. Invoices and projects stay on this phone and go out as locked PDFs.</p></div>' +
-      (importDraft ? '<div class="inv-bar" style="margin-bottom:1rem"><span>Your details came over from <b>TSS Invoice Creator</b>, with invoice <b class="mono">' + esc(importDraft.invoice.num) + "</b>. Check them, add anything missing, and save; the invoice opens next.</span></div>" : "") +
-      "<h2 style=\"margin:0 0 0.6rem\">Your company</h2>" + companyForm(c, !S.company) + "</div>";
-    bindCompanyForm($main, c, function (done) {
-      done.createdAt = done.createdAt || M.today(); S.company = done; S.settings.onboarded = true; save(true);
-      if (importDraft) { var inv = importDraft.invoice; importDraft = null; addImported(inv); return; }
-      go("#/"); toast("Saved. Your first invoice takes about two minutes.");
+    function draw() {
+      $main.innerHTML = '<div class="view welcome"><div class="welcome-top">' + MARK.replace('class="mark"', 'class="mark big"') + "<h1>" + M.NAME + '</h1><p class="muted">' + esc(M.TAGLINE) + "</p></div>" +
+        (importDraft ? '<div class="inv-bar"><span>Your details came over from <b>TSS Invoice Creator</b>, with invoice <b class="mono">' + esc(importDraft.invoice.num) + "</b>. Check the name and save; the invoice opens next.</span></div>" : "") +
+        '<div class="card stack">' + field("What is your business called?", input("name", c.name, 'type="text" placeholder="Hart Electric LLC" autocomplete="organization" enterkeyhint="go"'), "It prints at the top of every invoice.") +
+        '<div class="row">' + (c.logo ? '<img src="' + c.logo + '" alt="Your logo" style="max-height:48px;max-width:160px"><button type="button" class="btn small" data-logo-clear>Remove</button>' : '<label class="btn small file-btn">Add a logo<input type="file" accept="image/*" data-logo></label><span class="small muted">Optional</span>') + "</div></div>" +
+        (importDraft ? '<button type="button" class="btn primary big block" data-company-save>Save and open the invoice</button>' :
+          '<button type="button" class="btn primary big block" data-first>Make my first invoice</button><button type="button" class="btn block" data-company-save>Look around first</button>') +
+        '<p class="small muted center">About two minutes. No account, no sign-up; everything stays with you.' + (importDraft ? "" : '<br><button type="button" class="btn-text" data-sample>Just looking? Load a sample company.</button>') + "</p></div>";
+    }
+    function keep() { var el = $main.querySelector('[data-k="name"]'); if (el) c.name = el.value; }
+    function finish(first) {
+      keep();
+      if (!c.name.trim()) { toast("Your business name is the one thing an invoice cannot do without."); $main.querySelector('[data-k="name"]').focus(); return; }
+      c.name = c.name.trim(); if (!c.payTo) c.payTo = c.name; c.createdAt = c.createdAt || M.today();
+      var fresh = !S.company; S.company = c; S.settings.onboarded = true;
+      /* Details that came with the name (an invoice carried over) count as asked; a new name alone does not. */
+      if (fresh) S.settings.asked = importDraft ? { details: true, pay: true, tax: true, terms: true } : {};
+      save(true);
+      if (importDraft) { var imp = importDraft.invoice; importDraft = null; addImported(imp); return; }
+      if (first) { var inv = newInvoice("simple"); replaceTo("#/ask/" + inv.id); return; }
+      replaceTo("#/");
+    }
+    draw();
+    onMain("change", function (e) { if (!e.target.matches("[data-logo]")) return; var f = e.target.files && e.target.files[0]; if (!f) return; keep(); readLogo(f, function (url) { c.logo = url; draw(); }); });
+    onMain("keydown", function (e) { if (e.key === "Enter" && e.target.matches('[data-k="name"]')) { e.preventDefault(); finish(!importDraft); } });
+    onMain("click", function (e) {
+      if (e.target.closest("[data-logo-clear]")) { keep(); c.logo = ""; draw(); return; }
+      if (e.target.closest("[data-first]")) { finish(true); return; }
+      if (e.target.closest("[data-company-save]")) { finish(false); return; }
+      if (e.target.closest("[data-sample]")) loadSample();
     });
   }
   /* An invoice carried over from TSS Invoice Creator: kept as a draft, its number kept unless it is taken. */
@@ -288,14 +319,15 @@
     S.invoices.push(inv); if (inv.cust.name) ensureClient(inv); save(true);
     go("#/edit/" + inv.id); toast("Brought over from TSS Invoice Creator. Check it, then download it from here.", 4200);
   }
-  function viewCompany() {
-    tabs("more"); header("Company profile", { back: "#/more" });
+  function viewCompany(from) {
+    var backTo = from === "home" ? "#/" : "#/more";
+    tabs(from === "home" ? "home" : "more"); header("Company profile", { back: backTo });
     var c = M.clone(S.company);
-    $main.innerHTML = '<div class="view">' + companyForm(c, false) + "</div>";
-    bindCompanyForm($main, c, function (done) { S.company = done; save(true); toast("Company profile saved."); go("#/more"); });
+    $main.innerHTML = '<div class="view">' + companyForm(c) + "</div>";
+    bindCompanyForm($main, c, function (done) { S.company = done; S.settings.asked = { details: true, pay: true, tax: true, terms: true }; save(true); toast("Company profile saved."); go(backTo); });
   }
   function loadSample() {
-    S.company = M.sampleCompany(); S.settings.onboarded = true;
+    S.company = M.sampleCompany(); S.settings.onboarded = true; S.settings.asked = { details: true, pay: true, tax: true, terms: true };
     var cl = M.blankClient(); cl.name = "Lakeside Dental"; cl.attn = "Accounts payable"; cl.addr = "42 Lakeview Dr\nPrairie City, IL 60000"; cl.email = "ap@lakesidedental.example"; S.clients.push(cl);
     var pr = M.blankProject(); pr.name = "Second-floor exam rooms"; pr.clientId = cl.id; pr.kind = "progress"; pr.contract = 9600; pr.planned = 3; pr.po = "PO 4471"; S.projects.push(pr);
     var a = M.sampleInvoice(S.company, "advanced"); a.num = "INV-1042"; a.date = M.addDays(M.today(), -20); a.due = M.dueFor(a.date, a.terms); a.status = "sent"; a.sentAt = a.date; a.clientId = cl.id; a.projectId = pr.id; a.deposit = 1500; a.lines = [{ d: "Mobilization and demolition", q: 1, u: "", r: 3200, t: false }]; a.prog = { on: true, contract: 9600, n: 1, m: 3, prev: 0 }; a.freight = ""; a.payments = [{ id: M.uid(), date: M.addDays(M.today(), -5), amount: 1700, method: "Check", note: "Check 2231" }];
@@ -304,6 +336,16 @@
   }
 
   /* ---------- Home ---------- */
+  /* A price as the choice cards show it: during the free launch, struck through with "Free" beside it. */
+  function priceTag(p) { return M.PRICING.mode === "free" ? "<s>" + M.priceText(p) + "</s>Free" : M.priceText(p); }
+  /* What the profile still lacks, in the words the Home card uses. */
+  function profileGaps() {
+    var c = S.company, gaps = [];
+    if (!c.addr) gaps.push("your address");
+    if (!c.phone && !c.email) gaps.push("a phone number or email");
+    if (!c.payInstr && !c.payLink) gaps.push("how customers pay you");
+    return gaps;
+  }
   function viewHome() {
     tabs("home"); header(S.company.name);
     var today = M.today(), open = S.invoices.filter(function (i) { var s = M.status(i); return s === "sent" || s === "partial" || s === "overdue"; });
@@ -313,24 +355,30 @@
     var recent = S.invoices.slice().sort(function (a, b) { return (b.updatedAt || "").localeCompare(a.updatedAt || "") || (b.createdAt || "").localeCompare(a.createdAt || ""); }).slice(0, 5);
     var openProjects = S.projects.filter(function (p) { return p.status !== "closed"; }).slice(0, 3);
     var free = M.PRICING.mode === "free", under = M.PRICING.freeUnder ? M.priceText(M.PRICING.freeUnder) : "";
-    var priceTag = function (p) { return free ? "<s>" + M.priceText(p) + "</s>Free" : M.priceText(p); };
+    /* The chips that count something open the list they count. */
     var hero = S.invoices.length ?
       '<div class="hero"><div class="l">Outstanding</div><div class="v">' + money(outstanding) + '</div><div class="chips">' +
-        (overdue.length ? '<span class="chip warn">' + overdue.length + (overdue.length === 1 ? " overdue" : " overdue") + "</span>" : '<span class="chip">Nothing overdue</span>') +
+        (overdue.length ? '<a class="chip warn" href="#/invoices/overdue">' + overdue.length + " overdue</a>" : '<span class="chip">Nothing overdue</span>') +
         (paidMonth ? '<span class="chip good">' + money(paidMonth) + " paid this month</span>" : "") +
-        '<span class="chip">' + open.length + (open.length === 1 ? " open invoice" : " open invoices") + "</span></div></div>" :
-      '<div class="hero"><div class="l">Welcome</div><div class="v" style="font-family:var(--sans);font-size:1.35rem">Your first invoice is a tap away.</div><div class="chips">' +
-        (under ? '<span class="chip good">Under ' + under + ": free</span>" : "") + '<span class="chip">' + (free ? "Free during launch" : "Pay once per invoice") + "</span><span class=\"chip\">No account, nothing leaves your phone</span></div></div>";
+        (open.length ? '<a class="chip" href="#/invoices/open">' + open.length + (open.length === 1 ? " open invoice" : " open invoices") + "</a>" : "") + "</div></div>" :
+      '<div class="hero"><div class="l">Welcome</div><div class="v" style="font-family:var(--sans);font-size:1.35rem">Your first invoice takes about two minutes.</div><div class="chips">' +
+        (under ? '<span class="chip good">Under ' + under + ": free</span>" : "") + '<span class="chip">No account, nothing leaves your phone</span></div></div>';
+    var gaps = profileGaps();
+    var setup = gaps.length && !S.settings.setupLater ? '<div class="card"><div class="row between"><h2>Finish your profile</h2><button type="button" class="btn-text quiet small" data-setup-later>Later</button></div><p class="small muted" style="margin:0.3rem 0 0.7rem">Not on your invoices yet: ' + gaps.join(", ") + '.</p><a class="btn" href="#/company/home">Add ' + (gaps.length === 1 ? "it" : "them") + "</a></div>" : "";
     $main.innerHTML = '<div class="view stack">' + hero +
-      '<div class="card ledger"><div class="row between" style="margin-bottom:0.6rem"><h2>New invoice</h2><span class="small ' + (free ? "pill free" : "muted") + '">' + (free ? "Free during launch" : (under ? "Under " + under + ": free" : "")) + "</span></div>" +
-      '<div class="choice"><button type="button" class="opt" data-new="simple"><div class="h"><span>Simple</span><span class="price">' + priceTag(M.PRICING.simple) + '</span></div><div class="small muted">Who, what, how much, a discount or a deposit, when it is due, how to pay. One page.</div></button>' +
-      '<button type="button" class="opt adv" data-new="advanced"><div class="h"><span>Advanced</span><span class="price">' + priceTag(M.PRICING.advanced) + '</span></div><div class="small muted">Everything in simple, plus PO and job site, progress billing on a project, freight, retainage, late fees, your signature.</div></button></div>' +
-      '<p class="small muted" style="margin:0.7rem 0 0">' + (under ? "<b>Any invoice under " + under + " is free.</b> " : "") + "Pay once per invoice when you download it, never a subscription." + "</p></div>" +
+      '<div class="card ledger"><div class="row between" style="margin-bottom:0.6rem"><h2>New invoice</h2>' + (free ? '<span class="small pill free">Free during launch</span>' : "") + "</div>" +
+      '<div class="choice"><button type="button" class="opt" data-new="simple"><div class="h"><span>Simple</span><span class="price">' + priceTag(M.PRICING.simple) + '</span></div><div class="small muted">One page: who, what, how much, when it is due.</div></button>' +
+      '<button type="button" class="opt adv" data-new="advanced"><div class="h"><span>Advanced</span><span class="price">' + priceTag(M.PRICING.advanced) + '</span></div><div class="small muted">Adds a PO, job site, progress billing, retainage and your signature.</div></button></div>' +
+      '<p class="small muted" style="margin:0.7rem 0 0">' + (under ? "<b>Under " + under + " is always free.</b> " : "") + "Pay once per invoice, never a subscription.</p></div>" +
+      setup +
       (attention.length ? '<div><div class="section-head"><h2>Needs attention</h2></div><div class="list">' + attention.slice(0, 4).map(invoiceItem).join("") + "</div></div>" : "") +
-      (recent.length ? '<div><div class="section-head"><h2>Recent</h2><a href="#/invoices" class="small">All invoices</a></div><div class="list">' + recent.map(invoiceItem).join("") + "</div></div>" : emptyState("No invoices yet. Pick Simple or Advanced above; the first one takes about two minutes.")) +
+      (recent.length ? '<div><div class="section-head"><h2>Recent</h2><a href="#/invoices" class="small">All invoices</a></div><div class="list">' + recent.map(invoiceItem).join("") + "</div></div>" : "") +
       (openProjects.length ? '<div><div class="section-head"><h2>Projects</h2><a href="#/projects" class="small">All projects</a></div><div class="list">' + openProjects.map(projectItem).join("") + "</div></div>" : "") +
       "</div>";
-    onMain("click", function (e) { var b = e.target.closest("[data-new]"); if (b) go("#/new/" + b.getAttribute("data-new")); });
+    onMain("click", function (e) {
+      var b = e.target.closest("[data-new]"); if (b) { go("#/new/" + b.getAttribute("data-new")); return; }
+      if (e.target.closest("[data-setup-later]")) { S.settings.setupLater = true; save(); viewHome(); toast("It is under More, Company profile, when you want it."); }
+    });
   }
 
   /* ---------- New invoice: tier, then tool ---------- */
@@ -338,19 +386,25 @@
     tabs("home"); header("New invoice", { back: projectId ? "#/project/" + projectId : "#/" });
     if (tier !== "simple" && tier !== "advanced") {
       $main.innerHTML = '<div class="view stack"><h1>Which kind?</h1><div class="choice">' +
-        '<button type="button" class="opt" data-tier="simple"><div class="h"><span>Simple</span><span class="price">' + M.priceText(M.PRICING.simple) + '</span></div><ul><li>Your name or logo, the customer, a number and dates</li><li>Line items, one sales tax, a discount, a deposit, notes</li><li>How to pay you, with a pay link if you have one</li></ul></button>' +
-        '<button type="button" class="opt adv" data-tier="advanced"><div class="h"><span>Advanced</span><span class="price">' + M.priceText(M.PRICING.advanced) + '</span></div><ul><li>Everything in simple</li><li>Purchase order, reference, job site, service period</li><li>Progress billing on a project: invoice 2 of 3, billed to date, remaining</li><li>Freight, retainage, late fee terms, tax per line</li><li>Your signature and a customer acceptance line</li></ul></button></div>' +
-        '<p class="small muted">' + (M.PRICING.freeUnder ? "Any invoice under " + M.priceText(M.PRICING.freeUnder) + " is free, whichever kind. " : "") + (M.PRICING.mode === "free" ? "Both are free during launch. " : "Your first invoice is free. ") + "After that you pay once per invoice when you download it, or buy a pack; nothing renews on its own. A simple invoice can switch to advanced any time.</p></div>";
+        '<button type="button" class="opt" data-tier="simple"><div class="h"><span>Simple</span><span class="price">' + priceTag(M.PRICING.simple) + '</span></div><ul><li>Your name or logo, the customer, a number and dates</li><li>Line items, one sales tax, a discount, a deposit, notes</li><li>How to pay you, with a pay link if you have one</li></ul></button>' +
+        '<button type="button" class="opt adv" data-tier="advanced"><div class="h"><span>Advanced</span><span class="price">' + priceTag(M.PRICING.advanced) + '</span></div><ul><li>Everything in simple</li><li>Purchase order, reference, job site, service period</li><li>Progress billing on a project: invoice 2 of 3, billed to date, remaining</li><li>Freight, retainage, late fee terms, tax per line</li><li>Your signature and a customer acceptance line</li></ul></button></div>' +
+        '<p class="small muted">' + (M.PRICING.freeUnder ? "<b>Under " + M.priceText(M.PRICING.freeUnder) + " is always free.</b> " : "") + (M.PRICING.mode === "free" ? "Both kinds are free during launch; after that you" : "Your first invoice is free. After that you") + " pay once per invoice, never a subscription. A simple invoice can switch to advanced later.</p></div>";
       onMain("click", function (e) { var b = e.target.closest("[data-tier]"); if (b) go("#/new/" + b.getAttribute("data-tier") + (projectId ? "/" + projectId : "")); });
       return;
     }
-    $main.innerHTML = '<div class="view stack"><h1>' + (tier === "advanced" ? "Advanced" : "Simple") + ' invoice</h1><p class="muted">Two ways to make it. Both end on the same invoice, and you can switch between them any time.</p><div class="choice">' +
-      '<button type="button" class="opt" data-tool="ask"><div class="h"><span>Ask me</span></div><div class="small muted">One question at a time: who it is for, what you did, when it is due. Good on a phone, good when you are new to invoicing.</div></button>' +
-      '<button type="button" class="opt" data-tool="edit"><div class="h"><span>On the page</span></div><div class="small muted">The invoice is the form. Tap any part of it and type, add the parts you need. Good when you know what you want.</div></button></div></div>';
+    /* Once the person has picked a way to make invoices, a new one opens that way (More changes it). The screen that
+       makes the invoice does not stay in the phone's history, so the back button cannot make a second one. */
+    var pref = S.settings.tool;
+    if (pref === "ask" || pref === "edit") { var made = newInvoice(tier, projectId); replaceTo((pref === "ask" ? "#/ask/" : "#/edit/") + made.id); return; }
+    $main.innerHTML = '<div class="view stack"><h1>' + (tier === "advanced" ? "Advanced" : "Simple") + ' invoice</h1><p class="muted">Two ways to make it. Both end on the same invoice.</p><div class="choice">' +
+      '<button type="button" class="opt" data-tool="ask"><div class="h"><span>Ask me</span></div><div class="small muted">One question at a time. Good on a phone.</div></button>' +
+      '<button type="button" class="opt" data-tool="edit"><div class="h"><span>On the page</span></div><div class="small muted">The invoice is the form: tap any part of it and type.</div></button></div></div>';
     onMain("click", function (e) {
       var b = e.target.closest("[data-tool]"); if (!b) return;
-      var inv = newInvoice(tier, projectId);
-      go((b.getAttribute("data-tool") === "ask" ? "#/ask/" : "#/edit/") + inv.id);
+      var tool = b.getAttribute("data-tool"), inv = newInvoice(tier, projectId);
+      S.settings.tool = tool; save();
+      replaceTo((tool === "ask" ? "#/ask/" : "#/edit/") + inv.id);
+      toast("New invoices will open this way. More changes it.", 3600);
     });
   }
   function newInvoice(tier, projectId) {
@@ -363,117 +417,253 @@
   function setClient(inv, cl) { inv.clientId = cl.id; inv.cust = { name: cl.name, attn: cl.attn || "", addr: cl.addr || "", email: cl.email || "", phone: cl.phone || "" }; if (cl.terms) { inv.terms = cl.terms; if (inv.dueAuto) inv.due = M.dueFor(inv.date, inv.terms); } }
   function touch(inv) { inv.updatedAt = M.today(); }
 
-  /* ---------- The wizard: one question at a time ---------- */
-  function viewWizard(id) {
+  /* ---------- The wizard: one question at a time ----------
+     Each question has its own address (#/ask/<invoice>/<step>), so the phone's back button goes one question back.
+     A routine simple invoice is three questions: who, what, when. The first invoice also asks, once, for the details
+     that print at the top and for how customers pay; those answers go to the company profile and are not asked again.
+     An advanced invoice adds the project, the reference details and the signature. */
+  var wizFrom = {}, wizPlan = {}, wizTimer = null, wizFlush = null;
+  function wizardSteps(inv) {
+    var adv = inv.tier === "advanced", c = S.company, asked = S.settings.asked || {}, ids = ["customer"];
+    if (adv) ids.push("project");
+    ids.push("work", "dates");
+    if (adv) ids.push("extras");
+    if (!asked.details && !(c.addr || c.phone || c.email)) ids.push("details");
+    if (!asked.pay && !(c.payInstr || c.payLink)) ids.push("pay");
+    if (adv) ids.push("sign");
+    return ids;
+  }
+  /* Saved customers, the ones billed most recently first. */
+  function recentClients() {
+    var last = {};
+    S.invoices.forEach(function (i) { if (i.clientId && (i.date || "") > (last[i.clientId] || "")) last[i.clientId] = i.date || ""; });
+    return S.clients.slice().sort(function (a, b) { return (last[b.id] || b.createdAt || "").localeCompare(last[a.id] || a.createdAt || "") || a.name.localeCompare(b.name); });
+  }
+  function viewWizard(id, stepId) {
     var inv = invoiceById(id); if (!inv) return go("#/");
-    var adv = inv.tier === "advanced", cur = inv.currency;
-    tabs(null);
-    var steps = [
-      { id: "customer", q: "Who is this invoice for?", why: "Their name is all it needs. The address and email help their bookkeeper.", html: function () {
-        var chips = S.clients.length ? '<div class="field"><div class="lbl">Saved customers</div><div class="chips">' + S.clients.map(function (c) { return '<button type="button" class="chip' + (inv.clientId === c.id ? " on" : "") + '" data-client="' + c.id + '">' + esc(c.name) + "</button>"; }).join("") + "</div></div>" : "";
-        return chips + field("Customer or company", input("cust.name", inv.cust.name, 'type="text" autocomplete="organization" placeholder="Lakeside Dental"')) +
+    var adv = inv.tier === "advanced", cur = inv.currency, c = S.company;
+    var asked = S.settings.asked || (S.settings.asked = {});
+    tabs(null); document.body.classList.add("has-bar");
+    var shown = function (k, v) { return !!(inv.show || {})[k] || (v !== "" && v != null && M.num(v) !== 0); };
+    var ALL = {
+      customer: { q: "Who is this invoice for?", why: "A name is enough. With an email, you can send it straight from here.", html: function () {
+        var open = !adv && inv.clientId ? S.projects.filter(function (p) { return p.status !== "closed" && (p.clientId === inv.clientId || p.id === inv.projectId); }) : [];
+        return field("Customer or company", input("cust.name", inv.cust.name, 'type="text" autocomplete="off" placeholder="Lakeside Dental"')) + (function (s) { return '<div class="field" data-sugg' + (s ? "" : " hidden") + ">" + s + "</div>"; })(suggest(inv.cust.name)) +
           (adv ? field("Attention", input("cust.attn", inv.cust.attn, 'type="text" placeholder="Accounts payable, or a person"')) : "") +
-          field("Billing address", textarea("cust.addr", inv.cust.addr, "Street\nCity, State ZIP", 2)) +
-          '<div class="inline-fields">' + field("Email", input("cust.email", inv.cust.email, 'type="email"')) + (adv ? field("Phone", input("cust.phone", inv.cust.phone, 'type="tel"')) : "") + "</div>";
-      }, valid: function () { return !!inv.cust.name.trim() || "Who is it for? A name is enough."; } },
-      { id: "project", q: "Is this part of a project?", why: adv ? "Projects keep several invoices together: what was billed before, what is left, which invoice this is. Skip it for one-off work." : "Projects keep the invoices for one job together so you can see what has been billed and paid. Progress billing figures print on advanced invoices.", html: function () {
+          field("Email", input("cust.email", inv.cust.email, 'type="email" autocomplete="off"')) +
+          (adv ? field("Phone", input("cust.phone", inv.cust.phone, 'type="tel"')) : "") +
+          field("Billing address (optional)", textarea("cust.addr", inv.cust.addr, "Street\nCity, State ZIP", 2)) +
+          (open.length ? '<div class="field"><div class="lbl">Part of a project?</div><div class="chips"><button type="button" class="chip' + (!inv.projectId ? " on" : "") + '" data-proj="">No project</button>' + open.map(function (p) { return '<button type="button" class="chip' + (inv.projectId === p.id ? " on" : "") + '" data-proj="' + p.id + '">' + esc(p.name) + "</button>"; }).join("") + "</div></div>" : "");
+      }, valid: function () { return !!inv.cust.name.trim() || "Who is it for? A name is enough."; },
+      after: function () {
+        /* A saved customer typed by name, not picked: their address and email come along. Typed over a customer picked
+           before, the name of another saved customer brings that customer's details in place of the first one's. */
+        var name = inv.cust.name.trim().toLowerCase(), picked = inv.clientId && clientById(inv.clientId), cl = S.clients.filter(function (x) { return x.name.trim().toLowerCase() === name; })[0];
+        if (cl && picked && picked.id !== cl.id) setClient(inv, cl);
+        else if (cl && !picked) { ["attn", "addr", "email", "phone"].forEach(function (k) { if (!inv.cust[k] && cl[k]) inv.cust[k] = cl[k]; }); inv.clientId = cl.id; }
+        ensureClient(inv);
+        if (!adv) { var pr = inv.projectId && projectById(inv.projectId); if (pr) M.applyProject(inv, pr, S.invoices); }
+      } },
+      project: { q: "Is this part of a project?", why: "Projects keep several invoices together: what was billed before, what is left, which invoice this is. Skip it for one-off work.", html: function () {
         var list = S.projects.filter(function (p) { return p.status !== "closed" && (!p.clientId || !inv.clientId || p.clientId === inv.clientId); });
         return '<div class="chips"><button type="button" class="chip' + (!inv.projectId && !inv._newProject ? " on" : "") + '" data-proj="">No project</button>' + list.map(function (p) { return '<button type="button" class="chip' + (inv.projectId === p.id ? " on" : "") + '" data-proj="' + p.id + '">' + esc(p.name) + "</button>"; }).join("") + '<button type="button" class="chip add' + (inv._newProject ? " on" : "") + '" data-proj="new">+ New project</button></div>' +
           (inv._newProject ? '<div class="card flat stack" data-newproj>' + field("Project name", input("name", inv._newProject.name, 'type="text" placeholder="Second-floor exam rooms"')) +
             '<div class="field"><div class="lbl">How it is billed</div><div class="chips"><button type="button" class="chip' + (inv._newProject.kind === "once" ? " on" : "") + '" data-kind="once">One invoice</button><button type="button" class="chip' + (inv._newProject.kind === "progress" ? " on" : "") + '" data-kind="progress">Several invoices</button></div></div>' +
-            (inv._newProject.kind === "progress" ? '<div class="inline-fields">' + field("Contract amount", moneyInput("contract", inv._newProject.contract, "0.00", cur)) + field("Planned invoices", input("planned", inv._newProject.planned, 'type="text" inputmode="numeric" data-num')) + "</div>" + (adv ? '<div class="inline-fields">' + field("Customer PO", input("po", inv._newProject.po, 'type="text"')) + field("Retainage %", input("retain", inv._newProject.retain, 'type="text" inputmode="decimal" data-num placeholder="0"'), "Held back from each invoice until the job is done.") + "</div>" : "") : (adv ? field("Customer PO", input("po", inv._newProject.po, 'type="text"')) : "")) + "</div>" : "") +
+            (inv._newProject.kind === "progress" ? '<div class="inline-fields">' + field("Contract amount", moneyInput("contract", inv._newProject.contract, "0.00", cur)) + field("Planned invoices", input("planned", inv._newProject.planned, 'type="text" inputmode="numeric" data-num')) + "</div>" + '<div class="inline-fields">' + field("Customer PO", input("po", inv._newProject.po, 'type="text"')) + field("Retainage %", input("retain", inv._newProject.retain, 'type="text" inputmode="decimal" data-num placeholder="0"'), "Held back until the job is done.") + "</div>" : field("Customer PO", input("po", inv._newProject.po, 'type="text"'))) + "</div>" : "") +
           (inv.projectId && projectById(inv.projectId) ? '<div class="picked">' + projectSummaryLine(projectById(inv.projectId)) + "</div>" : "");
-      }, valid: function () { if (inv._newProject && !inv._newProject.name.trim()) return "Give the project a name, or pick No project."; return true; } },
-      { id: "work", q: "What are you billing for?", why: "One line per thing. A quantity times a rate makes the amount; for a flat price leave the quantity at 1.", html: function () { var past = pastItems(); return (adv ? field("In a sentence (optional)", textarea("desc", inv.desc, "What the work was and the dates it covered", 2)) : "") + '<datalist id="bh-items">' + past.map(function (it) { return '<option value="' + esc(it.d) + '">'; }).join("") + '</datalist><div class="lines-ed" data-lines>' + inv.lines.map(lineForm).join("") + '</div><div class="row"><button type="button" class="btn" style="flex:1" data-addline>' + I.plus + " Add another line</button>" + (past.length ? '<button type="button" class="btn" data-pastitems>Past items</button>' : "") + "</div>"; },
-        valid: function () { return inv.lines.some(function (l) { return l.d.trim() || M.num(l.r); }) || "At least one line, with what it was and what it costs."; } },
-      { id: "tax", q: "Sales tax?", why: "Tax prints on its own line. Leave it blank if you do not collect it" + (adv ? "; the tax pills on each line say which lines it applies to." : "."), html: function () {
-        return '<div class="inline-fields">' + field("Rate (percent)", input("tax", inv.tax, 'type="text" inputmode="decimal" placeholder="0" data-num')) + field("Label", input("taxLabel", inv.taxLabel, 'type="text" placeholder="Sales tax"')) + "</div><div class=\"chips\"><button type=\"button\" class=\"chip\" data-notax>No tax</button>" + (S.company.taxRate !== "" ? '<button type="button" class="chip" data-usualtax>' + esc(String(S.company.taxRate)) + "% (your usual)</button>" : "") + "</div>";
+      }, valid: function () { if (inv._newProject && !inv._newProject.name.trim()) return "Give the project a name, or pick No project."; return true; },
+      after: function () {
+        if (inv._newProject) { var p = M.merge(M.blankProject(), inv._newProject); p.clientId = inv.clientId || (ensureClient(inv) || {}).id || ""; if (p.kind !== "progress") p.planned = 1; S.projects.push(p); inv.projectId = p.id; delete inv._newProject; }
+        var pr = inv.projectId && projectById(inv.projectId);
+        if (pr) M.applyProject(inv, pr, S.invoices); else if (inv.prog) inv.prog.on = false;
       } },
-      { id: "dates", q: "When is it due?", why: "A calendar date gets paid sooner than a term alone, so both print.", html: function () {
-        return '<div class="inline-fields">' + field("Invoice date", input("date", inv.date, 'type="date"')) + field("Invoice number", input("num", inv.num, 'type="text" class="mono"')) + "</div>" +
-          '<div class="field"><div class="lbl">Terms</div><div class="chips">' + M.TERMS.map(function (t) { return '<button type="button" class="chip' + (inv.terms === t ? " on" : "") + '" data-terms="' + t + '">' + t + "</button>"; }).join("") + "</div></div>" +
-          field("Due date", input("due", inv.due, 'type="date"'), "Set from the terms; change it if you agreed something else.");
-      }, valid: function () { return (!!inv.date && !!inv.due) || "The invoice needs a date and a due date."; } },
-      { id: "extras", q: "Anything else on this one?", why: "Turn on what applies. Each prints in its place on the invoice.", html: function () {
+      work: { q: "What are you billing for?", why: "One line per thing. For a flat price, leave the quantity at 1.", html: function () {
+        var past = pastItems(), chips = [];
+        if (!shown("disc", inv.disc)) chips.push(["disc", "Discount"]);
+        if (!shown("deposit", inv.deposit)) chips.push(["deposit", "Deposit received"]);
+        if (adv && !shown("freight", inv.freight)) chips.push(["freight", "Freight"]);
+        if (adv && !shown("retain", inv.retain)) chips.push(["retain", "Retainage"]);
+        var noteOn = !!(inv.show || {}).notes || !!inv.pay.notes;
+        if (!noteOn) chips.push(["notes", "Note to the customer"]);
+        return (adv ? field("In a sentence (optional)", textarea("desc", inv.desc, "What the work was and the dates it covered", 2)) : "") + '<datalist id="bh-items">' + past.map(function (it) { return '<option value="' + esc(it.d) + '">'; }).join("") + '</datalist><div class="lines-ed" data-lines>' + inv.lines.map(lineForm).join("") + '</div><div class="row"><button type="button" class="btn" style="flex:1" data-addline>' + I.plus + " Add another line</button>" + (past.length ? '<button type="button" class="btn" data-pastitems>Past items</button>' : "") + "</div>" +
+          totalsBox() + (chips.length ? '<div class="chips">' + chips.map(function (x) { return '<button type="button" class="chip add" data-addpart="' + x[0] + '">+ ' + x[1] + "</button>"; }).join("") + "</div>" : "") +
+          (noteOn ? field("Note to the customer", textarea("pay.notes", inv.pay.notes, "Thank you, warranty, what happens next", 2)) + '<button type="button" class="btn-text quiet small" style="justify-self:start" data-rmpart="notes">Remove the note</button>' : "");
+      }, valid: function () { return inv.lines.some(function (l) { return (l.d || "").trim() || M.num(l.r); }) || "At least one line: what it was and what it costs."; },
+      after: function () {
+        /* The first tax rate typed becomes the usual one. */
+        if (!asked.tax && c.taxRate === "" && M.num(inv.tax) > 0) { c.taxRate = M.num(inv.tax); asked.tax = true; toast("Saved " + c.taxRate + "% as your usual tax rate."); }
+      } },
+      dates: { q: "When is it due?", why: "Net 30 means 30 days after the invoice date. The terms and the date both print.", html: function () {
+        return '<div class="field"><div class="lbl">Terms</div><div class="chips">' + M.TERMS.map(function (t) { return '<button type="button" class="chip' + (inv.terms === t ? " on" : "") + '" data-terms="' + t + '">' + t + "</button>"; }).join("") + "</div></div>" +
+          field("Due date", input("due", inv.due, 'type="date"')) +
+          '<div class="inline-fields">' + field("Invoice date", input("date", inv.date, 'type="date"')) + field("Invoice number", input("num", inv.num, 'type="text" class="mono" autocomplete="off"')) + "</div>";
+      }, valid: function () {
+        if (!inv.date || !inv.due) return "The invoice needs a date and a due date.";
+        if (!String(inv.num || "").trim()) return "The invoice needs a number.";
+        if (S.invoices.some(function (i) { return i.id !== inv.id && i.status !== "void" && i.num === inv.num; })) return "Another invoice already has that number.";
+        return true;
+      }, after: function () {
+        /* The first terms picked become the usual ones. */
+        if (!asked.terms) { if (inv.terms !== c.terms) { c.terms = inv.terms; toast("Saved " + inv.terms + " as your usual terms."); } asked.terms = true; }
+      } },
+      extras: { q: "Anything else on this one?", why: "Turn on what applies. Each prints in its place on the invoice.", html: function () {
         var show = inv.show || {};
         var sw = function (k, label, help, on) { return '<label class="switch"><span class="sw-l"><span>' + label + "</span>" + (help ? '<span class="help">' + help + "</span>" : "") + '</span><input type="checkbox" data-ex="' + k + '"' + (on ? " checked" : "") + '><span class="sw"></span></label>'; };
         return '<div class="card flat" style="padding:0.2rem 1rem">' +
-          (adv ? sw("po", "Purchase order number", "How their system matches your invoice to approved money", show.po || inv.po) + (show.po || inv.po ? field("PO number", input("po", inv.po, 'type="text"')) : "") +
+          sw("po", "Purchase order number", "How their system matches your invoice to approved money", show.po || inv.po) + (show.po || inv.po ? field("PO number", input("po", inv.po, 'type="text"')) : "") +
           sw("ref", "Reference", "Your quote or job number", show.ref || inv.ref) + (show.ref || inv.ref ? field("Reference", input("ref", inv.ref, 'type="text" placeholder="Quote 1042"')) : "") +
           sw("ship", "Ship to or job site", "", show.ship || inv.ship) + (show.ship || inv.ship ? field("Address", textarea("ship", inv.ship, "Job site or shipping address", 2)) : "") +
-          sw("period", "Service period", "The dates the work covered", show.period || inv.from || inv.to) + (show.period || inv.from || inv.to ? '<div class="inline-fields">' + field("From", input("from", inv.from, 'type="date"')) + field("To", input("to", inv.to, 'type="date"')) + "</div>" : "") : "") +
-          sw("disc", "Discount", "", show.disc || inv.disc !== "") + (show.disc || inv.disc !== "" ? '<div class="inline-fields">' + field("Discount", inv.discPct ? input("disc", inv.disc, 'type="text" inputmode="decimal" data-num placeholder="0"') : moneyInput("disc", inv.disc, "0.00", cur)) + '<div class="field"><div class="lbl">Kind</div><div class="chips"><button type="button" class="chip' + (!inv.discPct ? " on" : "") + '" data-discpct="0">Amount</button><button type="button" class="chip' + (inv.discPct ? " on" : "") + '" data-discpct="1">Percent</button></div></div></div>' : "") +
-          sw("deposit", "Deposit already received", "Comes off the balance due", show.deposit || inv.deposit !== "") + (show.deposit || inv.deposit !== "" ? field("Deposit", moneyInput("deposit", inv.deposit, "0.00", cur)) : "") +
-          (adv ? sw("freight", "Freight or shipping", "Not taxed", show.freight || inv.freight !== "") + (show.freight || inv.freight !== "" ? field("Freight", moneyInput("freight", inv.freight, "0.00", cur)) : "") +
-          sw("retain", "Retainage", "A percent held back until the job is done", show.retain || inv.retain !== "") + (show.retain || inv.retain !== "" ? field("Retainage (percent)", input("retain", inv.retain, 'type="text" inputmode="decimal" data-num placeholder="10"')) : "") +
+          sw("period", "Service period", "The dates the work covered", show.period || inv.from || inv.to) + (show.period || inv.from || inv.to ? '<div class="inline-fields">' + field("From", input("from", inv.from, 'type="date"')) + field("To", input("to", inv.to, 'type="date"')) + "</div>" : "") +
           sw("accept", "Customer acceptance line", "A blank line for them to sign", inv.accept) +
-          sw("taxid", "Print your tax ID", S.company.taxid ? "Tax ID " + esc(S.company.taxid) : "Add it under Company profile first", inv.showTaxid) : "") +
+          sw("taxid", "Print your tax ID", c.taxid ? "Tax ID " + esc(c.taxid) : "Add it under Company profile first", inv.showTaxid) +
           "</div>";
       } },
-      { id: "pay", q: "How should they pay you?", why: "Prefilled from your company profile. Change it here for this invoice only.", html: function () {
-        return field("Make checks payable to", input("pay.to", inv.pay.to, 'type="text"')) + field("Payment instructions", textarea("pay.instr", inv.pay.instr, "Mail a check to the address above, ACH details, cards accepted", 3)) + field("Payment link", input("pay.link", inv.pay.link, 'type="url" placeholder="https://"')) +
-          (adv ? field("Late fee or early-pay terms", input("pay.late", inv.pay.late, 'type="text" placeholder="1.5% per month after the due date"')) : "") + field("Note to the customer", textarea("pay.notes", inv.pay.notes, "Thank you, warranty, what happens next", 2));
-      } },
-      { id: "sign", q: "Sign it?", why: "Optional. A drawn signature prints above a line with your name and the date. The PDF is locked, so nobody can lift it off the page.", adv: true, html: function () {
+      details: { q: "Your details on the invoice", why: "Asked once. They print at the top of every invoice so customers can reach you. Leave out what you do not want printed.", html: function () {
+        return field("Address", textarea("addr", c.addr, "Street\nCity, State ZIP", 2)) + field("Phone", input("phone", c.phone, 'type="tel" autocomplete="tel"')) + field("Email", input("email", c.email, 'type="email" autocomplete="email"'));
+      }, after: function () { asked.details = true; } },
+      pay: { q: "How do customers pay you?", why: "Asked once, then printed on every invoice. You can change it on any one invoice later.", html: function () {
+        return field("Payment instructions", textarea("pay.instr", inv.pay.instr, "Check by mail to the address above, Zelle, cash on completion", 3)) +
+          field("Payment link (optional)", input("pay.link", inv.pay.link, 'type="url" inputmode="url" placeholder="https://" autocomplete="off"'), "A PayPal, Venmo, Stripe or bank link. Invoices with a way to pay online get paid faster.");
+      }, after: function () { c.payInstr = inv.pay.instr || ""; c.payLink = inv.pay.link || ""; asked.pay = true; } },
+      sign: { q: "Sign it?", why: "Optional. A drawn signature prints above a line with your name and the date. The PDF is locked, so nobody can lift it off the page.", html: function () {
         return '<div class="chips"><button type="button" class="chip' + (!inv.sig.on ? " on" : "") + '" data-sigon="0">No signature</button><button type="button" class="chip' + (inv.sig.on ? " on" : "") + '" data-sigon="1">Sign this invoice</button></div>' +
           (inv.sig.on ? (inv.sig.png ? '<div class="card flat sig-saved"><img src="' + inv.sig.png + '" alt="Your signature"><div class="small muted">' + esc([inv.sig.name, inv.sig.title].filter(Boolean).join(", ")) + "</div><div class=\"row\" style=\"margin-top:0.5rem\"><button type=\"button\" class=\"btn small\" data-sign>Sign again</button></div></div>" : '<button type="button" class="btn block" data-sign>' + I.pen + " Draw your signature</button>") : "");
       }, valid: function () { return !inv.sig.on || !!inv.sig.png || "Draw a signature, or pick No signature."; } }
-    ].filter(function (s) { return !s.adv || adv; });
-    var at = Math.max(0, Math.min(steps.length - 1, Number(inv._step) || 0));
+    };
+    /* The questions for this invoice are settled when it first opens here, so answering one does not reshuffle the rest. */
+    var plan = wizPlan[inv.id];
+    if (!plan || plan.tier !== inv.tier) plan = wizPlan[inv.id] = { tier: inv.tier, ids: wizardSteps(inv) };
+    var steps = plan.ids.map(function (k) { var s = ALL[k]; s.id = k; return s; });
+    /* A draft from before the questions had names kept its place as a number. */
+    if (typeof inv._step === "number") inv._step = ["customer", "project", "work", "work", "dates", adv ? "extras" : "work", "pay", "sign"][inv._step] || "customer";
+    var want = stepId || inv._step || steps[0].id, at = 0;
+    steps.forEach(function (s, i) { if (s.id === want) at = i; });
+    function stepHash(i) { return "#/ask/" + inv.id + "/" + steps[i].id; }
+    /* Opened without a question in the address (a new invoice, or a draft picked up again): the address becomes the question's. */
+    if (stepId !== steps[at].id) { if (ART) memHash = stepHash(at); else history.replaceState(null, "", location.pathname + location.search + stepHash(at)); }
+
+    function suggest(q) {
+      q = String(q || "").trim().toLowerCase();
+      var list = recentClients().filter(function (cl) { return cl.name && (!q || cl.name.toLowerCase().indexOf(q) >= 0); });
+      if (q && list.length === 1 && list[0].id === inv.clientId && list[0].name.trim().toLowerCase() === q) list = [];
+      if (!list.length) return "";
+      return '<div class="lbl">' + (q ? "Saved customers" : "Recent customers") + '</div><div class="chips">' + list.slice(0, 6).map(function (cl) { return '<button type="button" class="chip' + (inv.clientId === cl.id ? " on" : "") + '" data-client="' + cl.id + '">' + esc(cl.name) + "</button>"; }).join("") + "</div>";
+    }
     function lineForm(l, i) {
-      return '<div class="line" data-line="' + i + '">' + '<div class="field"><input type="text" data-l="d" list="bh-items" value="' + esc(l.d) + '" placeholder="What was done or delivered" aria-label="Description"></div>' +
-        '<div class="nums' + (adv ? " adv" : "") + '"><div class="field"><label>Qty</label><input type="text" inputmode="decimal" data-l="q" value="' + esc(l.q) + '"></div>' + (adv ? '<div class="field"><label>Unit</label><input type="text" data-l="u" value="' + esc(l.u) + '" placeholder="hr, ea"></div>' : "") + '<div class="field"><label>Rate</label><span class="money-in" data-sym="' + esc(sym(cur)) + '"><input type="text" inputmode="decimal" data-l="r" value="' + esc(l.r) + '" placeholder="0.00"></span></div>' + (adv ? "" : '<div class="field"><label>Amount</label><div class="input lamt" style="display:flex;align-items:center;justify-content:flex-end">' + money(M.lineAmount(l), cur) + "</div></div>") + "</div>" +
-        '<div class="foot">' + (adv ? '<button type="button" class="chip' + (l.t !== false ? " on" : "") + '" data-ltax aria-pressed="' + (l.t !== false) + '">Taxable</button><span class="lamt">' + money(M.lineAmount(l), cur) + "</span>" : "<span></span>") + '<button type="button" class="btn-text quiet" data-rmline>Remove</button></div></div>';
+      return '<div class="line" data-line="' + i + '">' + '<div class="field"><input type="text" data-l="d" list="bh-items" value="' + esc(l.d) + '" placeholder="What was done or delivered" aria-label="Description, line ' + (i + 1) + '"></div>' +
+        '<div class="nums' + (adv ? " adv" : "") + '"><div class="field"><label for="l' + i + 'q">Qty</label><input id="l' + i + 'q" type="text" inputmode="decimal" data-l="q" value="' + esc(l.q) + '"></div>' + (adv ? '<div class="field"><label for="l' + i + 'u">Unit</label><input id="l' + i + 'u" type="text" data-l="u" value="' + esc(l.u) + '" placeholder="hr, ea"></div>' : "") + '<div class="field"><label for="l' + i + 'r">Rate</label><span class="money-in" data-sym="' + esc(sym(cur)) + '"><input id="l' + i + 'r" type="text" inputmode="decimal" data-l="r" value="' + esc(l.r) + '" placeholder="0.00"></span></div>' + (adv ? "" : '<div class="field"><div class="lbl r">Amount</div><div class="lamt out">' + money(M.lineAmount(l), cur) + "</div></div>") + "</div>" +
+        '<div class="foot">' + (adv ? '<button type="button" class="chip' + (l.t !== false ? " on" : "") + '" data-ltax aria-pressed="' + (l.t !== false) + '">Taxable</button><span class="lamt">' + money(M.lineAmount(l), cur) + "</span>" : "<span></span>") + (inv.lines.length > 1 ? '<button type="button" class="btn small ghost" data-rmline>Remove</button>' : "") + "</div></div>";
+    }
+    /* The sum under the lines: it adds up as the person types, and the tax rate, a discount and a deposit sit where they act. */
+    function totalsBox() {
+      var t = M.totals(inv);
+      var numIn = function (k, v, label, ph) { return '<input data-k="' + k + '" data-num type="text" inputmode="decimal" value="' + esc(v == null ? "" : v) + '" placeholder="' + (ph || "0") + '" aria-label="' + label + '">'; };
+      var moneyIn = function (k, v, label) { return '<span class="money-in" data-sym="' + esc(sym(cur)) + '">' + numIn(k, v, label, "0.00") + "</span>"; };
+      var pctIn = function (k, v, label, ph) { return '<span class="pct-in">' + numIn(k, v, label, ph) + "</span>"; };
+      /* A part the person added: what it comes to on the first line, where it is typed (and taken away) on the second. */
+      var part = function (k, label, amount, controls) { return '<div class="tpart"><div class="trow"><span>' + label + '</span><b data-t="' + k + '">' + amount + '</b></div><div class="tctl">' + controls + '<button type="button" class="btn-text quiet small" data-rmpart="' + k + '">Remove</button></div></div>'; };
+      var h = '<div class="totals" data-totals><div class="trow"><span>Subtotal</span><b data-t="sub">' + money(t.sub, cur) + "</b></div>";
+      if (shown("disc", inv.disc)) h += part("disc", "Discount", "-" + money(t.disc, cur), (inv.discPct ? pctIn("disc", inv.disc, "Discount percent") : moneyIn("disc", inv.disc, "Discount amount")) + '<button type="button" class="chip mini" data-discpct aria-label="Switch between an amount and a percent">' + (inv.discPct ? "% to " + esc(sym(cur)) : esc(sym(cur)) + " to %") + "</button>");
+      h += '<div class="trow"><span>' + esc(inv.taxLabel || "Sales tax") + " " + pctIn("tax", inv.tax, (inv.taxLabel || "Sales tax") + " percent") + '</span><b data-t="tax">' + money(t.tax, cur) + "</b></div>";
+      if (adv && shown("freight", inv.freight)) h += part("freight", "Freight", money(t.freight, cur), moneyIn("freight", inv.freight, "Freight"));
+      h += '<div class="trow strong"><span>Total</span><b data-t="total">' + money(t.total, cur) + "</b></div>";
+      if (adv && shown("retain", inv.retain)) h += part("retain", "Retainage held back", "-" + money(t.retainAmt, cur), pctIn("retain", inv.retain, "Retainage percent", "10"));
+      if (shown("deposit", inv.deposit)) h += part("deposit", "Deposit received", "-" + money(t.deposit, cur), moneyIn("deposit", inv.deposit, "Deposit received"));
+      if (shown("deposit", inv.deposit) || (adv && shown("retain", inv.retain))) h += '<div class="trow due"><span>Balance due</span><b data-t="due">' + money(t.due, cur) + "</b></div>";
+      return h + "</div>";
+    }
+    function patchTotals() {
+      var t = M.totals(inv), set = function (k, v) { var e = $main.querySelector('[data-t="' + k + '"]'); if (e) e.textContent = v; };
+      set("sub", money(t.sub, cur)); set("disc", "-" + money(t.disc, cur)); set("tax", money(t.tax, cur)); set("freight", money(t.freight, cur)); set("total", money(t.total, cur));
+      set("retain", "-" + money(t.retainAmt, cur)); set("deposit", "-" + money(t.deposit, cur)); set("due", money(t.due, cur));
+      $main.querySelectorAll("[data-line]").forEach(function (row, i) { if (inv.lines[i]) row.querySelectorAll(".lamt").forEach(function (el) { el.textContent = money(M.lineAmount(inv.lines[i]), cur); }); });
     }
     function render() {
-      var st = steps[at];
-      header((adv ? "Advanced" : "Simple") + " invoice", { back: "#/inv/" + inv.id, backLabel: "" });
-      $main.innerHTML = '<div class="wiz"><div class="prog">' + steps.map(function (s, i) { return "<i class=\"" + (i < at ? "done" : i === at ? "now" : "") + '"></i>'; }).join("") + '</div><div class="small muted">' + (at + 1) + " of " + steps.length + '</div><div class="q">' + st.q + '</div><div class="why">' + st.why + '</div><div class="step" data-step="' + st.id + '">' + st.html() + "</div></div>" +
-        '<div class="wiz-nav">' + (at > 0 ? '<button type="button" class="btn" data-prev>Back</button>' : '<button type="button" class="btn" data-go="#/edit/' + inv.id + '">On the page</button>') + '<button type="button" class="btn primary" data-next>' + (at === steps.length - 1 ? "See the invoice" : "Next") + "</button></div>";
+      var st = steps[at], last = at === steps.length - 1;
+      header((adv ? "Advanced" : "Simple") + " invoice", { close: true }); hdrClose = leave;
+      inv._step = st.id;
+      $main.innerHTML = '<div class="wiz"><div class="prog" role="progressbar" aria-valuemin="1" aria-valuemax="' + steps.length + '" aria-valuenow="' + (at + 1) + '" aria-label="Question ' + (at + 1) + " of " + steps.length + '">' + steps.map(function (s, i) { return "<i class=\"" + (i < at ? "done" : i === at ? "now" : "") + '"></i>'; }).join("") + '</div><div class="small muted">' + (at + 1) + " of " + steps.length + '</div><h1 class="q">' + st.q + '</h1><div class="why">' + st.why + '</div><div class="step" data-step="' + st.id + '">' + st.html() + "</div></div>" +
+        '<div class="wiz-nav">' + (at > 0 ? '<button type="button" class="btn" data-prev>Back</button>' : '<button type="button" class="btn" data-go="#/edit/' + inv.id + '">On the page</button>') + '<button type="button" class="btn primary" data-next>' + (last ? "See the invoice" : "Next") + "</button></div>";
+      $main.querySelectorAll(".step input:not([type=checkbox]):not([type=date])").forEach(function (el) { el.setAttribute("enterkeyhint", "next"); });
       var first = $main.querySelector(".step input[type=text], .step textarea"); if (first && window.innerWidth > 700) first.focus();
     }
     function readStep() {
-      var scope = $main.querySelector(".step"); if (!scope) return;
-      var st = steps[at];
-      if (st.id === "work") { scope.querySelectorAll("[data-line]").forEach(function (row, i) { var l = inv.lines[i]; if (!l) return; l.d = row.querySelector('[data-l="d"]').value; l.q = row.querySelector('[data-l="q"]').value === "" ? "" : M.num(row.querySelector('[data-l="q"]').value); var u = row.querySelector('[data-l="u"]'); if (u) l.u = u.value; var r = row.querySelector('[data-l="r"]').value; l.r = r === "" ? "" : M.num(r); }); var d = scope.querySelector('[data-k="desc"]'); if (d) inv.desc = d.value; return; }
-      if (st.id === "project") { var np = scope.querySelector("[data-newproj]"); if (np && inv._newProject) readFields(np, inv._newProject); return; }
-      if (st.id === "extras") { scope.querySelectorAll("[data-ex]").forEach(function (cb) { var k = cb.getAttribute("data-ex"); if (k === "accept") inv.accept = cb.checked; else if (k === "taxid") inv.showTaxid = cb.checked; else { inv.show[k] = cb.checked; if (!cb.checked) clearPart(inv, k); } }); }
+      var scope = $main.querySelector(".step"), st = steps[at].id;
+      if (!scope || scope.getAttribute("data-step") !== st) return;
+      if (st === "details") { readFields(scope, c); return; }
+      if (st === "project") { var np = scope.querySelector("[data-newproj]"); if (np && inv._newProject) readFields(np, inv._newProject); return; }
+      if (st === "work") scope.querySelectorAll("[data-line]").forEach(function (row, i) { var l = inv.lines[i]; if (!l) return; l.d = row.querySelector('[data-l="d"]').value; l.q = row.querySelector('[data-l="q"]').value === "" ? "" : M.num(row.querySelector('[data-l="q"]').value); var u = row.querySelector('[data-l="u"]'); if (u) l.u = u.value; var r = row.querySelector('[data-l="r"]').value; l.r = r === "" ? "" : M.num(r); });
+      if (st === "extras") scope.querySelectorAll("[data-ex]").forEach(function (cb) { var k = cb.getAttribute("data-ex"); if (k === "accept") inv.accept = cb.checked; else if (k === "taxid") inv.showTaxid = cb.checked; else { inv.show[k] = cb.checked; if (!cb.checked) clearPart(inv, k); } });
       readFields(scope, inv);
-      if (st.id === "dates") { inv.dueAuto = inv.due === M.dueFor(inv.date, inv.terms); }
-      touch(inv);
+      if (st === "dates") inv.dueAuto = inv.due === M.dueFor(inv.date, inv.terms);
+      inv.updatedAt = M.today();
     }
-    function finishProject() {
-      if (inv._newProject) { var p = M.merge(M.blankProject(), inv._newProject); p.clientId = inv.clientId || ensureClient(inv).id; if (p.kind !== "progress") { p.planned = 1; } S.projects.push(p); inv.projectId = p.id; delete inv._newProject; }
-      var pr = inv.projectId && projectById(inv.projectId);
-      if (pr) M.applyProject(inv, pr, S.invoices); else if (inv.prog) inv.prog.on = false;
+    function next() {
+      readStep();
+      var st = steps[at], v = st.valid ? st.valid() : true;
+      if (v !== true) { toast(v); return; }
+      if (st.after) st.after();
+      if (at < steps.length - 1) { var to = stepHash(at + 1); wizFrom[to] = currentHash(); inv._step = steps[at + 1].id; save(); go(to); return; }
+      delete inv._step; delete inv._newProject; delete wizPlan[inv.id]; save(true);
+      go("#/inv/" + inv.id); toast("Check it over, then send it.");
+    }
+    function prev() {
+      readStep(); save();
+      var to = stepHash(at - 1);
+      if (!ART && wizFrom[currentHash()] === to) history.back(); else replaceTo(to);
+    }
+    /* Closing the questions keeps what was typed as a draft; an invoice nobody typed into is not kept at all. */
+    function leave() {
+      readStep(); save(true);
+      if (M.isUntouched(inv)) { go("#/"); return; }
+      go("#/inv/" + inv.id); toast("Saved as a draft.");
     }
     onMain("click", function (e) {
       var t = e.target, b;
-      if ((b = t.closest("[data-next]"))) { readStep(); var v = steps[at].valid ? steps[at].valid() : true; if (v !== true) { toast(v); return; } if (steps[at].id === "project") finishProject(); if (steps[at].id === "customer") { ensureClient(inv); } save(); if (at < steps.length - 1) { at++; inv._step = at; render(); window.scrollTo(0, 0); } else { delete inv._step; delete inv._newProject; save(true); go("#/edit/" + inv.id); toast("Here is the invoice. Tap anything on it to change it."); } return; }
-      if ((b = t.closest("[data-prev]"))) { readStep(); save(); at--; inv._step = at; render(); window.scrollTo(0, 0); return; }
-      if ((b = t.closest("[data-client]"))) { var cl = clientById(b.getAttribute("data-client")); if (cl) { setClient(inv, cl); render(); } return; }
-      if ((b = t.closest("[data-proj]"))) { readStep(); var pid = b.getAttribute("data-proj"); if (pid === "new") { inv._newProject = inv._newProject || M.merge(M.blankProject(), { kind: adv ? "progress" : "once", planned: 3 }); inv.projectId = ""; } else { delete inv._newProject; inv.projectId = pid; var pr = projectById(pid); if (pr && pr.clientId && !inv.clientId) { var c2 = clientById(pr.clientId); if (c2) setClient(inv, c2); } } render(); return; }
+      if (t.closest("[data-next]")) { next(); return; }
+      if (t.closest("[data-prev]")) { prev(); return; }
+      if ((b = t.closest("[data-client]"))) { readStep(); var cl = clientById(b.getAttribute("data-client")); if (cl) { if (inv.clientId !== cl.id) inv.projectId = ""; setClient(inv, cl); save(); render(); } return; }
+      if ((b = t.closest("[data-proj]"))) { readStep(); var pid = b.getAttribute("data-proj"); if (pid === "new") { inv._newProject = inv._newProject || M.merge(M.blankProject(), { kind: "progress", planned: 3 }); inv.projectId = ""; } else { delete inv._newProject; inv.projectId = pid; var pr = projectById(pid); if (pr && pr.clientId && !inv.clientId) { var c2 = clientById(pr.clientId); if (c2) setClient(inv, c2); } } save(); render(); return; }
       if ((b = t.closest("[data-kind]"))) { readStep(); inv._newProject.kind = b.getAttribute("data-kind"); render(); return; }
-      if ((b = t.closest("[data-addline]"))) { readStep(); inv.lines.push(M.blankLine()); render(); var rows = $main.querySelectorAll("[data-line]"); var last = rows[rows.length - 1]; if (last) last.querySelector("input").focus(); return; }
-      if ((b = t.closest("[data-pastitems]"))) { readStep(); itemsSheet(inv, function () { render(); }); return; }
-      if ((b = t.closest("[data-rmline]"))) { readStep(); var i = Number(b.closest("[data-line]").getAttribute("data-line")); inv.lines.splice(i, 1); if (!inv.lines.length) inv.lines.push(M.blankLine()); render(); return; }
-      if ((b = t.closest("[data-ltax]"))) { readStep(); var li = Number(b.closest("[data-line]").getAttribute("data-line")); inv.lines[li].t = inv.lines[li].t === false; render(); return; }
-      if ((b = t.closest("[data-notax]"))) { inv.tax = ""; render(); return; }
-      if ((b = t.closest("[data-usualtax]"))) { inv.tax = S.company.taxRate; render(); return; }
-      if ((b = t.closest("[data-terms]"))) { readStep(); inv.terms = b.getAttribute("data-terms"); inv.due = M.dueFor(inv.date, inv.terms); inv.dueAuto = true; render(); return; }
-      if ((b = t.closest("[data-discpct]"))) { readStep(); inv.discPct = b.getAttribute("data-discpct") === "1"; render(); return; }
-      if ((b = t.closest("[data-sigon]"))) { readStep(); inv.sig.on = b.getAttribute("data-sigon") === "1"; if (inv.sig.on && !inv.sig.png && S.company.sig && S.company.sig.png) { inv.sig.png = S.company.sig.png; inv.sig.name = S.company.sig.name; inv.sig.title = S.company.sig.title; inv.sig.date = M.today(); } render(); return; }
-      if ((b = t.closest("[data-sign]"))) { readStep(); signatureSheet(inv, function () { render(); }); return; }
+      if (t.closest("[data-addline]")) { readStep(); inv.lines.push(M.blankLine()); render(); var rows = $main.querySelectorAll("[data-line]"), lastRow = rows[rows.length - 1]; if (lastRow) lastRow.querySelector("input").focus(); return; }
+      if (t.closest("[data-pastitems]")) { readStep(); itemsSheet(inv, function () { render(); }); return; }
+      if ((b = t.closest("[data-rmline]"))) { readStep(); inv.lines.splice(Number(b.closest("[data-line]").getAttribute("data-line")), 1); if (!inv.lines.length) inv.lines.push(M.blankLine()); save(); render(); return; }
+      if ((b = t.closest("[data-ltax]"))) { readStep(); var li = Number(b.closest("[data-line]").getAttribute("data-line")); inv.lines[li].t = inv.lines[li].t === false; save(); render(); return; }
+      if ((b = t.closest("[data-addpart]"))) { readStep(); var k = b.getAttribute("data-addpart"); inv.show[k] = true; save(); render(); var el = $main.querySelector('[data-k="' + (k === "notes" ? "pay.notes" : k) + '"]'); if (el) el.focus(); return; }
+      if ((b = t.closest("[data-rmpart]"))) { readStep(); var rk = b.getAttribute("data-rmpart"); inv.show[rk] = false; clearPart(inv, rk); save(); render(); return; }
+      if (t.closest("[data-discpct]")) { readStep(); inv.discPct = !inv.discPct; save(); render(); return; }
+      if ((b = t.closest("[data-terms]"))) { readStep(); inv.terms = b.getAttribute("data-terms"); inv.due = M.dueFor(inv.date, inv.terms); inv.dueAuto = true; save(); render(); return; }
+      if ((b = t.closest("[data-sigon]"))) { readStep(); inv.sig.on = b.getAttribute("data-sigon") === "1"; if (inv.sig.on && !inv.sig.png && c.sig && c.sig.png) { inv.sig.png = c.sig.png; inv.sig.name = c.sig.name; inv.sig.title = c.sig.title; inv.sig.date = M.today(); } save(); render(); return; }
+      if (t.closest("[data-sign]")) { readStep(); signatureSheet(inv, function () { render(); }); return; }
     });
     onMain("change", function (e) {
-      if (e.target.matches("[data-ex]")) { readStep(); render(); }
-      if (e.target.matches('[data-k="date"]')) { readStep(); if (inv.dueAuto) { inv.due = M.dueFor(inv.date, inv.terms); render(); } }
-      if (e.target.matches("[data-l]")) {
+      if (e.target.matches("[data-ex]")) { readStep(); save(); render(); return; }
+      if (e.target.matches('[data-k="date"]')) { readStep(); if (inv.dueAuto) { inv.due = M.dueFor(inv.date, inv.terms); render(); } return; }
+      if (e.target.matches('[data-l="d"]')) {
+        /* A line used before brings its rate along. */
         readStep(); var row = e.target.closest("[data-line]"), i = Number(row.getAttribute("data-line"));
-        if (e.target.getAttribute("data-l") === "d" && inv.lines[i].r === "") { var hit = pastItems().filter(function (it) { return it.d.toLowerCase() === inv.lines[i].d.trim().toLowerCase(); })[0]; if (hit && hit.r !== "") { inv.lines[i].r = hit.r; if (adv) inv.lines[i].u = hit.u; row.querySelector('[data-l="r"]').value = hit.r; } }
-        row.querySelectorAll(".lamt").forEach(function (el) { el.textContent = money(M.lineAmount(inv.lines[i]), cur); });
+        if (inv.lines[i].r === "") { var hit = pastItems().filter(function (it) { return it.d.toLowerCase() === inv.lines[i].d.trim().toLowerCase(); })[0]; if (hit && hit.r !== "") { inv.lines[i].r = hit.r; if (adv) inv.lines[i].u = hit.u; row.querySelector('[data-l="r"]').value = hit.r; var u = row.querySelector('[data-l="u"]'); if (u && adv) u.value = hit.u; patchTotals(); } }
       }
     });
+    /* What is typed is kept as it is typed, so a call or a dead battery in the middle costs nothing. */
+    onMain("input", function (e) {
+      var st = steps[at].id;
+      if (st === "work") { readStep(); patchTotals(); }
+      if (e.target.matches('[data-k="cust.name"]')) { var box = $main.querySelector("[data-sugg]"), sg = suggest(e.target.value); if (box) { box.innerHTML = sg; box.hidden = !sg; } }
+      clearTimeout(wizTimer); wizTimer = setTimeout(function () { readStep(); save(); }, 600);
+    });
+    /* Enter on the phone's keyboard moves on: to the rate inside a line, otherwise to the next question. */
+    onMain("keydown", function (e) {
+      if (e.key !== "Enter" || e.isComposing || !e.target.matches || !e.target.matches(".step input:not([type=checkbox])")) return;
+      e.preventDefault();
+      var l = e.target.getAttribute("data-l");
+      if (l === "d" || l === "q" || l === "u") { var r = e.target.closest("[data-line]").querySelector('[data-l="r"]'); if (r) { r.focus(); r.select(); return; } }
+      if (steps[at].id === "work") { e.target.blur(); return; }
+      var all = Array.prototype.slice.call($main.querySelectorAll(".step input:not([type=checkbox]):not([type=date]), .step textarea")), i = all.indexOf(e.target);
+      if (i >= 0 && i < all.length - 1) { all[i + 1].focus(); return; }
+      e.target.blur(); next();
+    });
+    wizFlush = function () { readStep(); save(); };
     render();
   }
   function clearPart(inv, k) {
@@ -482,10 +672,13 @@
   }
   function ensureClient(inv) {
     var name = (inv.cust.name || "").trim(); if (!name) return null;
-    var cl = inv.clientId && clientById(inv.clientId);
-    if (!cl) cl = S.clients.filter(function (c) { return c.name.trim().toLowerCase() === name.toLowerCase(); })[0];
+    /* A different name typed over a picked customer is a different customer, not a new name for the old one. When that
+       name is another saved customer's, their saved details are not overwritten by what was left on the invoice. */
+    var cl = inv.clientId && clientById(inv.clientId), other = false;
+    if (cl && cl.name.trim().toLowerCase() !== name.toLowerCase()) { cl = null; other = true; }
+    if (!cl) { cl = S.clients.filter(function (c) { return c.name.trim().toLowerCase() === name.toLowerCase(); })[0]; other = other && !!cl; }
     if (!cl) { cl = M.blankClient(); S.clients.push(cl); }
-    cl.name = name; ["attn", "addr", "email", "phone"].forEach(function (k) { if (inv.cust[k]) cl[k] = inv.cust[k]; });
+    cl.name = name; ["attn", "addr", "email", "phone"].forEach(function (k) { if (inv.cust[k] && (!other || !cl[k])) cl[k] = inv.cust[k]; });
     inv.clientId = cl.id;
     if (inv.projectId) { var pr = projectById(inv.projectId); if (pr && !pr.clientId) pr.clientId = cl.id; }
     return cl;
@@ -551,13 +744,16 @@
     var cur = inv.currency, adv = inv.tier === "advanced", c = S.company;
     header(inv.num, { back: "#/inv/" + inv.id, actions: '<button type="button" class="btn small primary" data-go="#/inv/' + inv.id + '">Done</button>' });
     var pr = inv.projectId && projectById(inv.projectId);
-    $main.innerHTML = '<div class="view wide">' +
-      '<div class="inv-bar"><span>' + (adv ? '<span class="pill adv">Advanced</span>' : '<span class="pill simple">Simple</span>') + ' <span data-pricebar>' + priceBar(inv) + '</span></span><span class="row" style="gap:0.3rem">' + (adv ? "" : '<button type="button" class="btn small" data-upgrade>Switch to advanced</button>') + '<button type="button" class="btn small" data-options>Options</button></span></div>' +
-      '<div class="inv-bar" data-projbar><span>' + (pr ? "Project: <b>" + esc(pr.name) + "</b>" + (inv.prog && inv.prog.on ? " · invoice " + esc(inv.prog.n) + " of " + esc(inv.prog.m) : "") : "Not on a project") + '</span><button type="button" class="btn small" data-project>' + (pr ? "Change" : "Add to a project") + "</button></div>" +
+    /* The invoice itself is what this screen is for, so it starts near the top: one slim bar says what the invoice
+       costs and opens the options, and the sending buttons stay within reach at the bottom of the screen. */
+    document.body.classList.add("has-bar");
+    $main.innerHTML = '<div class="view wide with-bar">' +
+      '<div class="inv-bar"><span>' + (adv ? '<span class="pill adv">Advanced</span>' : '<span class="pill simple">Simple</span>') + ' <span data-pricebar>' + priceBar(inv) + '</span></span><button type="button" class="btn small" data-options>Options</button></div>' +
+      (adv || pr ? '<div class="inv-bar" data-projbar><span>' + (pr ? "Project: <b>" + esc(pr.name) + "</b>" + (inv.prog && inv.prog.on ? " · invoice " + esc(inv.prog.n) + " of " + esc(inv.prog.m) : "") : "Not on a project") + '</span><button type="button" class="btn small" data-project>' + (pr ? "Change" : "Add to a project") + "</button></div>" : "") +
       (inv.status !== "draft" && inv.status !== "void" ? '<div class="inv-bar warn"><span>' + ((inv.sends || []).length ? esc(sendsText(inv)) : "This invoice went out " + esc(M.shortDate(inv.sentAt || inv.date)) + ".") + ' Changing it changes what you sent. For a correction, duplicate it as a new number instead.</span></div>' : "") +
-      '<div class="inv-tools">' + sendButtons() + '<span class="spacer"></span><button type="button" class="btn ghost small" data-go="#/ask/' + inv.id + '">Ask me instead</button></div>' +
-      '<p class="inv-note">Tap anything on the invoice to change it. The dashed links add the parts you need; the × takes them away. Nothing here prints.</p>' +
-      '<input type="file" accept="image/*" data-logo hidden><div class="inv" data-inv aria-label="Your invoice, editable"></div></div>';
+      '<p class="inv-note">Tap anything on the invoice to change it. The dashed links add more.</p>' +
+      '<input type="file" accept="image/*" data-logo hidden><div class="inv" data-inv aria-label="Your invoice, editable"></div></div>' +
+      '<div class="wiz-nav act">' + sendButtons(true) + "</div>";
     var inv_el = $main.querySelector("[data-inv]"), logoIn = $main.querySelector("[data-logo]");
     function render() { inv_el.innerHTML = invoiceHtml(inv, c, { edit: true }); inv_el.style.setProperty("--accent", /^#[0-9a-f]{6}$/i.test(c.accent) ? c.accent : "#1C3F7A"); inv_el.classList.toggle("locked", !inv.unlock); }
     function patch() {
@@ -569,7 +765,7 @@
       var pg = M.progress(inv); if (pg) { setText("[data-prog-this]", money(pg.thisInvoice, cur)); setText("[data-prog-billed]", money(pg.billed, cur)); setText("[data-prog-left]", money(pg.remaining, cur)); var bar = inv_el.querySelector("[data-prog-bar]"); if (bar) bar.style.width = pg.pct.toFixed(1) + "%"; }
     }
     function upgrade(k) {
-      return ask("Switch to advanced?", (k ? "<b>" + esc(M.ADVANCED[k]) + "</b> is part of the advanced invoice. " : "") + "Advanced is " + M.priceText(M.PRICING.advanced) + " instead of " + M.priceText(M.PRICING.simple) + " when paid downloads start" + (M.PRICING.mode === "free" ? " (free now)" : "") + ". Everything you have typed stays.", [{ label: "Switch to advanced", cls: "primary", value: true }, { label: "Keep it simple", value: false }]).then(function (yes) { if (yes) { inv.tier = "advanced"; adv = true; touch(inv); save(); viewEditor(inv.id); } return yes; });
+      return ask("Switch to advanced?", (k ? "<b>" + esc(M.ADVANCED[k]) + "</b> is part of the advanced invoice. " : "It adds a purchase order, job site, service period, progress billing on a project, freight, retainage, late fee terms, your signature and a customer acceptance line. ") + "Advanced is " + M.priceText(M.PRICING.advanced) + " instead of " + M.priceText(M.PRICING.simple) + " when paid downloads start" + (M.PRICING.mode === "free" ? " (free now)" : "") + ". Everything you have typed stays.", [{ label: "Switch to advanced", cls: "primary", value: true }, { label: "Keep it simple", value: false }]).then(function (yes) { if (yes) { inv.tier = "advanced"; adv = true; touch(inv); save(); viewEditor(inv.id); } return yes; });
     }
     inv_el.addEventListener("input", function (e) {
       var el = e.target;
@@ -614,6 +810,8 @@
         var k = b.getAttribute("data-show");
         if (k === "line") { addLine(); return; }
         if (k === "pastitems") { itemsSheet(inv, function () { render(); }); return; }
+        if (k === "adv") { upgrade(); return; }
+        if (k === "biz") { bizSheet(function () { header(inv.num, { back: "#/inv/" + inv.id, actions: '<button type="button" class="btn small primary" data-go="#/inv/' + inv.id + '">Done</button>' }); render(); }); return; }
         if (!adv && M.ADVANCED[k]) { upgrade(k).then(function (yes) { if (yes) { var i2 = invoiceById(inv.id); i2.show[k] = true; if (k === "prog") projectSheet(i2, function () { viewEditor(i2.id); }); else viewEditor(i2.id); } }); return; }
         if (k === "prog") { projectSheet(inv, function () { viewEditor(inv.id); }); return; }
         if (k === "sig") { signatureSheet(inv, function () { render(); }); return; }
@@ -637,9 +835,8 @@
       if (e.target.closest("[data-pdf]")) { makePdf(inv, false); return; }
       if (e.target.closest("[data-share]")) { makePdf(inv, true); return; }
       if (e.target.closest("[data-send]")) { sendSheet(inv); return; }
-      if (e.target.closest("[data-upgrade]")) { upgrade(); return; }
       if (e.target.closest("[data-project]")) { projectSheet(inv, function () { viewEditor(inv.id); }); return; }
-      if (e.target.closest("[data-options]")) { optionsSheet(inv, function () { viewEditor(inv.id); }); return; }
+      if (e.target.closest("[data-options]")) { optionsSheet(inv, { done: function () { viewEditor(inv.id); }, upgrade: function () { upgrade(); }, project: function () { projectSheet(inv, function () { viewEditor(inv.id); }); } }); return; }
     });
     render();
   }
@@ -668,7 +865,7 @@
       return '<span class="ed num' + (cls ? " " + cls : "") + '" contenteditable="true" inputmode="decimal" data-f="' + path + '" data-num="' + (fmt || "plain") + '" data-ph="' + esc(ph) + '">' + esc(text) + "</span>";
     }
     function dateField(path, ph) { var v = M.get(inv, path) || ""; if (!edit) return "<b>" + esc(M.longDate(v) || "") + "</b>"; return '<span class="dt" data-date="' + path + '"><input type="date" value="' + esc(v) + '" aria-label="' + esc(ph) + '"><b class="dt-text' + (v ? "" : " ph") + '">' + (M.longDate(v) || ph) + "</b></span>"; }
-    var addLink = function (key, label) { return edit ? '<button type="button" class="add' + (!adv && M.ADVANCED[key] ? " adv" : "") + '" data-show="' + key + '">+ ' + esc(label) + "</button>" : ""; };
+    var addLink = function (key, label) { return edit && (adv || !M.ADVANCED[key]) ? '<button type="button" class="add" data-show="' + key + '">+ ' + esc(label) + "</button>" : ""; };
     var removeLink = function (key, label) { return edit ? '<button type="button" class="rm" data-hide="' + key + '" aria-label="Remove ' + esc(label) + '">×</button>' : ""; };
     var st = M.status(inv), pg = M.progress(inv);
     var html = (st === "paid" || st === "void" ? '<div class="stamp ' + st + (o.slam ? " slam" : "") + '">' + st + "</div>" : "");
@@ -676,7 +873,7 @@
       (c.logo ? '<span class="logo-wrap"><img src="' + c.logo + '" alt="">' + (edit ? '<button type="button" class="rm logo-rm" data-logo-clear aria-label="Remove logo">×</button>' : "") + "</span>" : (edit ? '<button type="button" class="add logo-add" data-logo-pick>+ Add your logo</button>' : "")) +
       (c.logo ? '<span class="bc"><b>' + esc(c.name) + "</b></span>" : '<span class="bn">' + esc(c.name) + "</span>") + lines(c.addr).map(function (l) { return '<span class="bc">' + esc(l) + "</span>"; }).join("") + [c.phone, c.email, c.web].filter(Boolean).map(function (l) { return '<span class="bc">' + esc(l) + "</span>"; }).join("") +
       (adv && inv.showTaxid && c.taxid ? '<span class="bc">Tax ID ' + esc(c.taxid) + " " + removeLink("taxid", "tax ID") + "</span>" : "") + (adv && shown("vat", inv.vat) ? '<span class="bc">' + ed("vatLabel", "VAT no.", "inl") + " " + ed("vat", "Registration number", "inl") + " " + removeLink("vat", "registration number") + "</span>" : "") +
-      (edit ? '<span class="adds">' + (adv && !inv.showTaxid ? addLink("taxid", "Tax ID") : "") + (adv && !shown("vat", inv.vat) ? addLink("vat", "VAT or GST number") : "") + "</span>" : "") + "</div>" +
+      (edit ? '<span class="adds"><button type="button" class="add" data-show="biz">' + (c.addr || c.phone || c.email ? "Edit your details" : "+ Add your address and phone") + "</button>" + (adv && !inv.showTaxid ? addLink("taxid", "Tax ID") : "") + (adv && !shown("vat", inv.vat) ? addLink("vat", "VAT or GST number") : "") + "</span>" : "") + "</div>" +
       '<div class="inv-title"><h2>Invoice</h2>' + (edit ? '<label class="color-pick" title="Color on the invoice"><input type="color" value="' + esc(/^#[0-9a-f]{6}$/i.test(c.accent) ? c.accent : "#1C3F7A") + '" data-accent aria-label="Color on the invoice"><i></i>Color</label>' : "") +
       '<dl class="inv-meta"><div class="big"><dt>Invoice</dt><dd>' + ed("num", "INV-1001") + "</dd></div><div><dt>Date</dt><dd>" + dateField("date", "Pick a date") + "</dd></div>" +
       "<div><dt>Terms</dt><dd>" + (edit ? '<span class="sel"><select data-f="terms" aria-label="Terms">' + M.TERMS.map(function (x) { return "<option" + (x === inv.terms ? " selected" : "") + ">" + x + "</option>"; }).join("") + '</select><b class="sel-text">' + esc(inv.terms) + "</b></span>" : esc(inv.terms)) + "</dd></div>" +
@@ -702,7 +899,7 @@
     var prog = "";
     if (adv && pg) {
       prog = '<div class="inv-prog"><h3>Progress on ' + (inv.po ? esc(inv.po) : "the contract") + " " + removeLink("prog", "progress billing") + "</h3><div><span>Contract amount</span>" + edNum("prog.contract", money(0, cur), "", "money") + "</div><div><span>Previously billed</span>" + edNum("prog.prev", money(0, cur), "", "money") + '</div><div><span>This invoice (' + esc(pg.n) + " of " + esc(pg.m) + ')</span><span data-prog-this>' + money(pg.thisInvoice, cur) + '</span></div><div><span>Billed to date</span><span data-prog-billed>' + money(pg.billed, cur) + '</span></div><div><span>Remaining</span><span data-prog-left>' + money(pg.remaining, cur) + '</span></div><div class="bar"><i data-prog-bar style="width:' + pg.pct.toFixed(1) + '%"></i></div></div>';
-    } else if (edit) prog = '<div class="adds col">' + addLink("prog", "Progress billing (invoice 2 of 3 on a project)") + "</div>";
+    } else if (edit && adv) prog = '<div class="adds col">' + addLink("prog", "Progress billing (invoice 2 of 3 on a project)") + "</div>";
     var showTotal = t.disc || M.num(inv.tax) || t.freight || t.retainAmt || t.deposit || t.paid;
     var tot = '<div class="inv-totals"><div><span>Subtotal</span><span data-sub>' + money(t.sub, cur) + "</span></div>" +
       (shown("disc", inv.disc) ? "<div><span>Discount " + (edit ? '<button type="button" class="tax" data-discpct aria-pressed="' + (inv.discPct ? "true" : "false") + '" title="Percent or amount">' + (inv.discPct ? "%" : sym(cur)) + "</button>" : (inv.discPct ? "(" + M.num(inv.disc) + "%)" : "")) + removeLink("disc", "discount") + "</span>" + (inv.discPct ? edNum("disc", "0%", "", "pct") : edNum("disc", money(0, cur), "", "money")) + "</div>" : "") +
@@ -726,11 +923,11 @@
     if (adv && ((inv.sig && inv.sig.on) || inv.accept || edit)) {
       html += '<section class="inv-sig">' + (inv.sig && inv.sig.on ? "<div>" + (inv.sig.png ? '<img class="sig-img" src="' + inv.sig.png + '" alt="Signature">' : "") + '<div class="line signed">' + esc([inv.sig.name, inv.sig.title].filter(Boolean).join(", ") || "Authorized signature") + (inv.sig.date ? "<br>Signed electronically in " + M.NAME + " on " + esc(M.longDate(inv.sig.date)) : "") + (edit ? ' <button type="button" class="add" data-sign>Sign again</button> ' + removeLink("sig", "signature") : "") + "</div></div>" : (edit ? '<div class="adds col">' + addLink("sig", "Sign this invoice") + "</div>" : "")) +
         (inv.accept ? '<div><div class="line">Accepted by (customer)' + (edit ? " " + removeLink("accept", "acceptance line") : "") + '<span style="float:right">Date</span></div></div>' : (edit ? '<div class="adds col">' + addLink("accept", "Customer acceptance line") + "</div>" : "")) + "</section>";
-    } else if (edit && !adv) {
-      html += '<section class="inv-sig"><div class="adds col">' + addLink("sig", "Sign this invoice") + addLink("accept", "Customer acceptance line") + "</div></section>";
     }
     if (adv && shown("fine", inv.fine)) html += '<div class="inv-fine">' + ed("fine", "Terms and conditions", "", true) + " " + removeLink("fine", "terms") + "</div>";
-    else if (edit) html += '<div class="adds" style="margin-top:0.8rem">' + addLink("fine", "Terms and conditions") + "</div>";
+    else if (edit && adv) html += '<div class="adds" style="margin-top:0.8rem">' + addLink("fine", "Terms and conditions") + "</div>";
+    /* On a simple invoice the advanced parts are one link, which asks before it switches the invoice over. */
+    if (edit && !adv) html += '<div class="adds" style="margin-top:0.9rem"><button type="button" class="add adv" data-show="adv">+ PO, job site, progress billing, freight, retainage, signature</button></div>';
     var reach = [c.phone, c.email].filter(Boolean).join(" or ");
     html += '<footer class="inv-foot"><span>' + (reach ? "Questions? " + esc(reach) : "") + "</span><span>" + (inv.fingerprint ? "Invoice ID <b>" + esc(inv.fingerprint) + "</b> · " : "") + "Made with <b>" + M.NAME + "</b>, " + M.SITE + "</span></footer>";
     return html;
@@ -759,13 +956,36 @@
       });
     });
   }
-  function optionsSheet(inv, done) {
-    var adv = inv.tier === "advanced";
+  function optionsSheet(inv, on) {
+    var adv = inv.tier === "advanced", pr = inv.projectId && projectById(inv.projectId);
     sheet("<h2>Options</h2><div class=\"stack\" style=\"margin-top:0.6rem\">" +
-      (adv ? field("Currency", '<select data-k="currency">' + Object.keys(M.CURRENCIES).map(function (k) { return '<option value="' + k + '"' + (k === inv.currency ? " selected" : "") + ">" + k + ", " + M.CURRENCIES[k].name + "</option>"; }).join("") + "</select>") : '<p class="small muted">Currency, paper size and registration numbers are advanced-invoice options.</p>') +
-      field("Paper size", '<select data-k="paper">' + Object.keys(M.PAPER).map(function (k) { return '<option value="' + k + '"' + (k === S.company.paper ? " selected" : "") + ">" + M.PAPER[k] + "</option>"; }).join("") + "</select>", "For every invoice; set in your company profile.") +
+      (adv ? "" : '<button type="button" class="btn" data-upgrade>Switch to advanced</button><p class="small muted" style="margin:-0.4rem 0 0">Adds a PO, job site, progress billing, freight, retainage and your signature.</p>' +
+        '<button type="button" class="btn" data-project>' + (pr ? "Project: " + esc(pr.name) : "Add to a project") + "</button>") +
+      '<button type="button" class="btn" data-go="#/ask/' + inv.id + '">Ask me the questions instead</button>' +
+      (adv ? field("Currency", '<select data-k="currency">' + Object.keys(M.CURRENCIES).map(function (k) { return '<option value="' + k + '"' + (k === inv.currency ? " selected" : "") + ">" + k + ", " + M.CURRENCIES[k].name + "</option>"; }).join("") + "</select>") : "") +
+      field("Paper size", '<select data-k="paper">' + Object.keys(M.PAPER).map(function (k) { return '<option value="' + k + '"' + (k === S.company.paper ? " selected" : "") + ">" + M.PAPER[k] + "</option>"; }).join("") + "</select>", "For every invoice.") +
       '<button type="button" class="btn primary" data-ok>Done</button></div>', function (el) {
-      el.addEventListener("click", function (e) { if (!e.target.closest("[data-ok]")) return; var f = {}; readFields(el, f); if (adv && f.currency) inv.currency = f.currency; if (f.paper) S.company.paper = f.paper; touch(inv); save(); closeSheet(); done(); });
+      el.addEventListener("click", function (e) {
+        if (e.target.closest("[data-upgrade]")) { closeSheet(); on.upgrade(); return; }
+        if (e.target.closest("[data-project]")) { closeSheet(); on.project(); return; }
+        if (!e.target.closest("[data-ok]")) return;
+        var f = {}; readFields(el, f); if (adv && f.currency) inv.currency = f.currency; if (f.paper) S.company.paper = f.paper; touch(inv); save(); closeSheet(); on.done();
+      });
+    });
+  }
+  /* The details that print at the top of every invoice, from wherever the person noticed they were missing. */
+  function bizSheet(done) {
+    var c = S.company;
+    sheet('<h2>Your details</h2><p class="muted small">They print at the top of every invoice.</p><div class="stack">' + field("Business name", input("name", c.name, 'type="text" autocomplete="organization"')) + field("Address", textarea("addr", c.addr, "Street\nCity, State ZIP", 2)) +
+      field("Phone", input("phone", c.phone, 'type="tel" autocomplete="tel"')) + field("Email", input("email", c.email, 'type="email" autocomplete="email"')) + field("Website", input("web", c.web, 'type="text" placeholder="example.com" autocomplete="off"')) +
+      '<button type="button" class="btn primary big" data-ok>Save</button></div>', function (el) {
+      el.addEventListener("click", function (e) {
+        if (!e.target.closest("[data-ok]")) return;
+        var f = {}; readFields(el, f);
+        if (!String(f.name || "").trim()) { toast("The name is the one thing an invoice cannot do without."); return; }
+        c.name = f.name.trim(); c.addr = f.addr || ""; c.phone = f.phone || ""; c.email = f.email || ""; c.web = f.web || "";
+        (S.settings.asked || (S.settings.asked = {})).details = true; save(true); closeSheet(); done();
+      });
     });
   }
 
@@ -777,9 +997,10 @@
     header(inv.num, { back: pr ? "#/project/" + pr.id : "#/invoices", actions: (st !== "void" ? '<button type="button" class="btn small" data-go="#/edit/' + inv.id + '">' + I.pen + " Edit</button>" : "") });
     $main.innerHTML = '<div class="view wide stack">' +
       '<div class="card ledger"><div class="row between"><div><div class="row" style="gap:0.5rem">' + statusPill(inv) + '<span class="pill ' + (inv.tier === "advanced" ? "adv" : "simple") + '">' + inv.tier + '</span></div><div style="font-size:1.6rem;font-weight:600;margin-top:0.3rem" class="mono">' + money(st === "draft" || st === "paid" || st === "void" ? t.total : t.due, inv.currency) + '</div><div class="muted small">' + esc(inv.cust.name || "No customer yet") + " · " + esc(dueText(inv)) + (pr ? ' · <a href="#/project/' + pr.id + '">' + esc(pr.name) + "</a>" : "") + "</div></div></div>" +
-      '<div class="row" style="margin-top:0.9rem">' + (st !== "void" ? sendButtons() + (st !== "paid" && st !== "draft" ? '<button type="button" class="btn green" data-payment>' + I.check + " Record a payment</button>" : "") : "") + '<button type="button" class="btn" data-more>More</button></div>' +
+      /* The main button follows the invoice: a draft is for sending, one that went out is for getting paid. */
+      '<div class="row send-row" style="margin-top:0.9rem">' + (st === "void" ? "" : st === "draft" ? sendButtons() : (st !== "paid" ? '<button type="button" class="btn green" data-payment>' + I.check + " Record a payment</button>" : "") + sendButtons(false, true)) + '<button type="button" class="btn" data-more>More</button></div>' +
       ((inv.sends || []).length ? '<p class="small muted note-line" style="margin:0.6rem 0 0">' + I.mail + "<span>" + esc(sendsText(inv)) + "</span></p>" : "") +
-      (M.PRICING.mode === "free" ? '<p class="small muted" style="margin:0.7rem 0 0">Downloads are free during launch. Later, ' + (M.isSmall(inv) ? "this one stays free: it is under " + M.priceText(M.PRICING.freeUnder) + "." : M.priceText(M.price(inv)) + " once for this invoice (or a pack or a year pass); downloading it again is free.") + "</p>" : "") + "</div>" +
+      (M.PRICING.mode === "free" ? '<p class="small muted" style="margin:0.7rem 0 0">' + (M.isSmall(inv) ? "Under " + M.priceText(M.PRICING.freeUnder) + ", so this one is always free." : "Free during launch. Later, " + M.priceText(M.price(inv)) + " once for this invoice; sending it again stays free.") + "</p>" : "") + "</div>" +
       ((inv.payments || []).length ? '<div class="card"><div class="section-head" style="margin-top:0"><h2>Payments</h2><span class="mono small">' + money(t.paid, inv.currency) + " of " + money(t.owed, inv.currency) + '</span></div><div class="list">' + inv.payments.map(function (p) { return '<div class="item" style="cursor:default"><div><div class="t">' + esc(p.method || "Payment") + (p.note ? ", " + esc(p.note) : "") + '</div><div class="s">' + esc(M.longDate(p.date)) + '</div></div><div class="r"><div class="amt">' + money(p.amount, inv.currency) + '</div><button type="button" class="btn-text quiet small" data-rmpay="' + p.id + '">Remove</button></div></div>'; }).join("") + "</div></div>" : "") +
       '<div class="inv readonly' + (inv.unlock ? "" : " locked") + '" data-inv style="--accent:' + esc(/^#[0-9a-f]{6}$/i.test(S.company.accent) ? S.company.accent : "#1C3F7A") + '">' + invoiceHtml(inv, S.company, { edit: false, slam: slam }) + "</div>" +
       '<p class="small muted">' + (inv.fingerprint ? "Invoice ID " + esc(inv.fingerprint) + " is printed on the PDF; it changes if the invoice changes, so a copy that comes back can be checked against this one. " : "") + "Created " + esc(M.longDate(inv.createdAt)) + (inv.sentAt ? ", sent " + esc(M.longDate(inv.sentAt)) : "") + (inv.paidAt ? ", paid " + esc(M.longDate(inv.paidAt)) : "") + ".</p></div>";
@@ -834,7 +1055,8 @@
           if (inv.status === "draft") { inv.status = "sent"; inv.sentAt = M.today(); }
           ensureClient(inv);
           inv.sends = inv.sends || []; inv.sends.push({ at: new Date().toISOString(), to: mail.to, how: howSent }); touch(inv); save(true);
-          if (onInvoice(inv)) route();
+          /* Sent from the editor: the making is over, so the person lands on the invoice's own page, which says it went out. */
+          if (currentHash().indexOf("#/edit/" + inv.id) === 0) replaceTo("#/inv/" + inv.id); else if (onInvoice(inv)) route();
           toast(howSent === "share" ? "Pick the app to send it with. The address is copied; paste it in the To line." : (NATIVE ? "Press Send in your email app." : "The PDF is in your downloads; attach it and press Send."), 5000);
         };
         if (NATIVE) return NATIVE.emailPdf(out.bytes, out.name, mail).then(function () { done("email"); }, function (e) { toast("Could not open an email app: " + (e && e.message ? e.message : e)); done("cancelled"); });
@@ -1003,7 +1225,7 @@
       (p.kind === "progress" ? '<div style="margin:0.6rem 0 0.3rem"><div class="row between"><span class="small">Billed ' + money(s.billed) + " of " + money(s.contract) + (s.changes ? " (with " + money(s.changes) + " in change orders)" : "") + '</span><span class="small mono">' + Math.round(s.pct) + '%</span></div><div class="bar"><i style="width:' + s.pct.toFixed(1) + '%"></i></div></div>' : "") +
       '<div class="stats" style="margin-top:0.8rem"><div class="stat"><div class="v">' + money(s.billed) + '</div><div class="l">Billed</div></div><div class="stat green"><div class="v">' + money(s.paid) + '</div><div class="l">Paid</div></div><div class="stat' + (s.outstanding ? " red" : "") + '"><div class="v">' + money(s.outstanding) + '</div><div class="l">Outstanding</div></div></div>' +
       (p.kind === "progress" ? '<div class="stats" style="margin-top:0.6rem"><div class="stat"><div class="v">' + money(s.remaining) + '</div><div class="l">Remaining</div></div><div class="stat"><div class="v">' + money(s.retained) + '</div><div class="l">Retainage held</div></div><div class="stat"><div class="v">' + s.sent + " / " + Math.max(s.planned, s.sent) + '</div><div class="l">Invoices</div></div></div>' : "") +
-      (p.status !== "closed" ? '<div class="row" style="margin-top:0.9rem"><a class="btn primary" href="#/new//' + p.id + '">' + I.plus + " New invoice on this project</a></div>" : "") + "</div>" +
+      (p.status !== "closed" ? '<div class="row" style="margin-top:0.9rem"><a class="btn primary" href="#/new/' + (p.kind === "progress" ? "advanced" : "") + "/" + p.id + '">' + I.plus + " New invoice on this project</a></div>" : "") + "</div>" +
       (p.notes ? '<div class="card flat small">' + esc(p.notes).replace(/\n/g, "<br>") + "</div>" : "") +
       '<div class="section-head"><h2>Invoices</h2></div><div class="list">' + (s.invoices.length ? s.invoices.map(invoiceItem).join("") : emptyState("No invoices on this project yet.")) + "</div></div>";
   }
@@ -1063,6 +1285,7 @@
       '<button type="button" class="item" data-sig><div><div class="t">My signature</div><div class="s">' + (S.company.sig && S.company.sig.png ? "Saved. Used on advanced invoices with one tap." : "Draw it once, sign invoices with one tap.") + '</div></div><div class="r">›</div></button>' +
       '<a class="item" href="#/clients"><div><div class="t">Customers</div><div class="s">' + S.clients.length + " saved</div></div><div class=\"r\">›</div></a></div>" +
       '<div class="card"><h3>Look</h3><div class="chips" style="margin-top:0.5rem">' + [["auto", "Match the phone"], ["light", "Light"], ["dark", "Dark"]].map(function (l) { return '<button type="button" class="chip' + ((S.settings.look || "auto") === l[0] ? " on" : "") + '" data-setlook="' + l[0] + '">' + l[1] + "</button>"; }).join("") + "</div></div>" +
+      '<div class="card"><h3>New invoices open in</h3><div class="chips" style="margin-top:0.5rem">' + [["ask", "Ask me"], ["edit", "On the page"], ["", "Choose each time"]].map(function (t) { return '<button type="button" class="chip' + ((S.settings.tool || "") === t[0] ? " on" : "") + '" data-settool="' + t[0] + '">' + t[1] + "</button>"; }).join("") + '</div><p class="small muted" style="margin:0.5rem 0 0">Ask me goes one question at a time. On the page puts the invoice in front of you to type on.</p></div>' +
       (iosSafariTab() ? '<div class="card" style="border-color:var(--amber)"><h3>Keep it safe</h3><p class="small" style="margin-top:0.4rem">In Safari, tap Share, then <b>Add to Home Screen</b>. As a home-screen app, Billhead opens full screen and works offline, and Safari stops counting the days toward clearing its stored data (it clears a site\'s data after seven days without a visit). Keep a backup file either way.</p></div>' : "") +
       '<div class="card"><h3>Backup</h3><p class="small muted" style="margin-top:0.4rem">' + (NATIVE ? "Everything lives on this phone. When Google backup is on, Android backs the app up to your Google account and carries it to a new phone. A backup file is a second copy you control: keep one somewhere safe." : "Everything lives on this device only. A backup file holds your company, customers, projects and invoices; keep one somewhere safe, and use it to move to a new phone.") + '</p><div class="row"><button type="button" class="btn" data-backup>Save a backup file</button><label class="btn file-btn">Restore from a backup<input type="file" accept=".json,application/json" data-restore></label>' + (S.invoices.length ? '<button type="button" class="btn" data-csv>Invoices as CSV</button>' : "") + "</div></div>" +
       '<div class="card"><h3>Pricing</h3>' + (M.PRICING.mode === "free" ? '<p class="small" style="margin-top:0.4rem"><b>Free during launch.</b> The prices after that:</p>' : "") + pricingTable() +
@@ -1072,6 +1295,7 @@
     onMain("click", function (e) {
       var b;
       if ((b = e.target.closest("[data-setlook]"))) { S.settings.look = b.getAttribute("data-setlook"); applyLook(); save(); viewMore(); return; }
+      if ((b = e.target.closest("[data-settool]"))) { S.settings.tool = b.getAttribute("data-settool"); save(true); viewMore(); return; }
       if (e.target.closest("[data-sig]")) { var tmp = { sig: { name: S.company.sig.name, title: S.company.sig.title, png: "" }, updatedAt: "" }; signatureSheet(tmp, function () { viewMore(); toast("Signature saved."); }); return; }
       if (e.target.closest("[data-backup]")) { var text = JSON.stringify(S, null, 1); download(new Blob([text], { type: "application/json" }), "billhead-backup-" + M.today() + ".json"); toast("Backup saved."); return; }
       if (e.target.closest("[data-sample]")) { loadSample(); return; }
@@ -1144,6 +1368,14 @@
   }
 
   /* ---------- Start ---------- */
+  /* In the Android app the screen shrinks when the keyboard comes up, and a bar fixed to the bottom would ride on top
+     of it. body.kb marks that, and the editor's sending bar hides until the keyboard goes away. */
+  var baseW = window.innerWidth, baseH = window.innerHeight;
+  window.addEventListener("resize", function () {
+    if (window.innerWidth !== baseW) { baseW = window.innerWidth; baseH = window.innerHeight; }
+    if (window.innerHeight > baseH) baseH = window.innerHeight;
+    document.body.classList.toggle("kb", window.innerHeight < baseH - 150);
+  });
   applyLook();
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () { });
   var goParam = /[?&]go=([a-z-]+)/.exec(location.search);
